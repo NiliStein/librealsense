@@ -223,7 +223,7 @@ int main(int argv, const char** argc) try
 {
     rs2::log_to_console(RS2_LOG_SEVERITY_WARN);
 
-    ux_window window("Intel RealSense Viewer");
+    ux_window window("Breathing");
 
     // Create RealSense Context
     context ctx;
