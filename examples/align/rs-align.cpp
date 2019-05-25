@@ -44,9 +44,18 @@ int main(int argc, char * argv[]) try
     // Create a pipeline to easily configure and start the camera
     rs2::pipeline pipe;
     rs2::config cfg;
-    cfg.enable_stream(RS2_STREAM_DEPTH);
-    cfg.enable_stream(RS2_STREAM_COLOR);
-    pipe.start(cfg);
+
+	//ImGui::CreateContext();
+	//ImGuiIO& io = ImGui::GetIO();
+	//io.DisplaySize.x = 1280.0f;
+	//io.DisplaySize.y = 720.0f;
+
+	//ImGui_ImplGlfw_NewFrame(1);
+	//ImGui::Begin("RealSense Align Example");
+	//rs2::viewer_model viewer_model;
+	//std::string start_camera_button_text = rs2::to_string::to_string() << "  Start Camera\t\t\t\t\t\t\t\t\t\t\t";
+	
+	//ImGui::End();
 
     // Define two align objects. One will be used to align
     // to depth viewport and the other to color.
@@ -58,53 +67,76 @@ int main(int argc, char * argv[]) try
     float       alpha = 0.5f;               // Transparancy coefficient 
     direction   dir = direction::to_depth;  // Alignment direction
 
+	bool camera_on = false;
+
     while (app) // Application still alive?
     {
-        // Using the align object, we block the application until a frameset is available
-        rs2::frameset frameset = pipe.wait_for_frames();
+		// Render the UI:
+		ImGui_ImplGlfw_NewFrame(1);
 
-        if (dir == direction::to_depth)
-        {
-            // Align all frames to depth viewport
-            frameset = align_to_depth.process(frameset);
-        }
-        else
-        {
-            // Align all frames to color viewport
-            frameset = align_to_color.process(frameset);
-        }
+		if (ImGui::Button("Start_Camera") || camera_on) {
 
-        // With the aligned frameset we proceed as usual
-        auto depth = frameset.get_depth_frame();
-        auto color = frameset.get_color_frame();
-        auto colorized_depth = c.colorize(depth);
+			if (!camera_on) {
+				cfg.enable_stream(RS2_STREAM_DEPTH);
+				cfg.enable_stream(RS2_STREAM_COLOR);
+				pipe.start(cfg);
+				camera_on = true;
+			}
 
-        glEnable(GL_BLEND);
-        // Use the Alpha channel for blending
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			if (ImGui::Button("Stop_Camera")) {
+				camera_on = false;
+				cfg.disable_stream(RS2_STREAM_DEPTH);
+				cfg.disable_stream(RS2_STREAM_COLOR);
+				pipe.stop();
+				continue;
+			}
 
-        if (dir == direction::to_depth)
-        {
-            // When aligning to depth, first render depth image
-            // and then overlay color on top with transparancy
-            depth_image.render(colorized_depth, { 0, 0, app.width(), app.height() });
-            color_image.render(color, { 0, 0, app.width(), app.height() }, alpha);
-        }
-        else
-        {
-            // When aligning to color, first render color image
-            // and then overlay depth image on top
-            color_image.render(color, { 0, 0, app.width(), app.height() });
-            depth_image.render(colorized_depth, { 0, 0, app.width(), app.height() }, 1 - alpha);
-        }
+			// Using the align object, we block the application until a frameset is available
+			rs2::frameset frameset = pipe.wait_for_frames();
 
-        glColor4f(1.f, 1.f, 1.f, 1.f);
-        glDisable(GL_BLEND);
 
-        // Render the UI:
-        ImGui_ImplGlfw_NewFrame(1);
-        render_slider({ 15.f, app.height() - 60, app.width() - 30, app.height() }, &alpha, &dir);
-        ImGui::Render();
+			if (dir == direction::to_depth)
+			{
+				// Align all frames to depth viewport
+				frameset = align_to_depth.process(frameset);
+			}
+			else
+			{
+				// Align all frames to color viewport
+				frameset = align_to_color.process(frameset);
+			}
+
+			// With the aligned frameset we proceed as usual
+			auto depth = frameset.get_depth_frame();
+			auto color = frameset.get_color_frame();
+			auto colorized_depth = c.colorize(depth);
+
+			glEnable(GL_BLEND);
+			// Use the Alpha channel for blending
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+			if (dir == direction::to_depth)
+			{
+				// When aligning to depth, first render depth image
+				// and then overlay color on top with transparancy
+				depth_image.render(colorized_depth, { 0, 0, app.width(), app.height() });
+				color_image.render(color, { 0, 0, app.width(), app.height() }, alpha);
+			}
+			else
+			{
+				// When aligning to color, first render color image
+				// and then overlay depth image on top
+				color_image.render(color, { 0, 0, app.width(), app.height() });
+				depth_image.render(colorized_depth, { 0, 0, app.width(), app.height() }, 1 - alpha);
+			}
+
+			glColor4f(1.f, 1.f, 1.f, 1.f);
+			glDisable(GL_BLEND);
+			
+		}
+ 
+		render_slider({ 15.f, app.height() - 60, app.width() - 30, app.height() }, &alpha, &dir);
+		ImGui::Render();
     }
 
     return EXIT_SUCCESS;
