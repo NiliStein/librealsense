@@ -1,4 +1,5 @@
-/* Realtime Breathing Gui */
+/* Realtime Breathing Gui App */
+/* To use multiple cameras, see rs-multicam: It's possible to use a pipe the same way, and measure all frames in all pipes. */
 
 #include <librealsense2/rs.hpp>
 #include "example.hpp"
@@ -17,6 +18,7 @@
 
 int main(int argc, char * argv[]) try
 {
+	//rs2::log_to_console(RS2_LOG_SEVERITY_WARN);
 	// Create and initialize GUI related objects
 	window app(1280, 720, "RealtimeBreathing"); // Create windows app window
 	ImGui_ImplGlfw_Init(app, false);      // ImGui library intializition
@@ -41,6 +43,7 @@ int main(int argc, char * argv[]) try
 		// Render the UI:
 		ImGui_ImplGlfw_NewFrame(1);
 
+		//Stat camera botton:
 		if (ImGui::Button("Start_Camera") || camera_on) {
 
 			if (!camera_on) {
@@ -49,7 +52,8 @@ int main(int argc, char * argv[]) try
 				pipe.start(cfg);
 				camera_on = true;
 			}
-
+			
+			//Stop camera toggle button:
 			if (ImGui::Button("Stop_Camera")) {
 				camera_on = false;
 				cfg.disable_stream(RS2_STREAM_DEPTH);
@@ -73,14 +77,54 @@ int main(int argc, char * argv[]) try
 			auto color = frameset_color.get_color_frame();
 			auto colorized_depth = colorizer.colorize(depth);
 
-			//TODO: split to 2 windows depth and color
-			depth_image.render(colorized_depth, { 640, 360, app.width()/2, app.height()/2 });
+			//Collect all frames:
+			//Using a map as in rs-multicam to allow future changes in number of cameras displayed.
+			std::map<int, rs2::frame> render_frames;
+			std::vector<rs2::frame> new_frames;
+			rs2::frameset fs;
+			if (pipe.poll_for_frames(&fs))
+			{
+				for (const rs2::frame& f : fs)
+					new_frames.emplace_back(f);
+			}
 
-			color_image.render(color, { 0, 360, app.width() / 2, app.height() / 2 });
+			// Convert the newly-arrived frames to render-firendly format
+			for (const auto& frame : new_frames)
+			{
+				render_frames[frame.get_profile().unique_id()] = colorizer.process(frame);
+			}
+
+			// Present all the collected frames with openGl mosaic
+			app.show(render_frames);
+
+			//The following commented code was the previous implementation to the division to two images of depth and color:
+			////Two split frames in app, left for color and right for depth:
+			//depth_image.render(colorized_depth, { 640, 360, app.width() / 2, app.height() / 2 });
+			//color_image.render(color, { 0, 360, app.width() / 2, app.height() / 2 });
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);
 
+			//TODO: Fix distance presentation
+			//Show the distance of the image from the camera:
+			// Try to get a frame of a depth image
+			rs2::depth_frame depth_frame = frameset_depth.get_depth_frame();
+
+			// Get the depth frame's dimensions
+			float depth_frame_width = depth_frame.get_width();
+			float depth_frame_height = depth_frame.get_height();
+
+			// Query the distance from the camera to the object in the center of the image
+			float dist_to_center = depth.get_distance(depth_frame_width / 2, depth_frame_height / 2);
+
+			//Show the distance in a dialog box:
+			bool open = true;
+			if (ImGui::BeginPopupModal("Distance From Camera", &open))
+			{
+				//The following function uses printf() format string:
+				ImGui::TextWrapped("Distance From Camera is: %f", dist_to_center);
+			}
+			ImGui::Render();
 		}
 
 		ImGui::Render();
