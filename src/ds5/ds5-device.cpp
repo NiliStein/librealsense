@@ -28,6 +28,7 @@
 #include "proc/spatial-filter.h"
 #include "proc/temporal-filter.h"
 #include "proc/hole-filling-filter.h"
+#include "../common/fw/firmware-version.h"
 
 namespace librealsense
 {
@@ -78,6 +79,68 @@ namespace librealsense
         _hw_monitor->send(cmd);
     }
 
+    void ds5_device::enter_update_state() const
+    {
+        try {
+            LOG_INFO("entering to update state, device disconnect is expected");
+            command cmd(ds::DFU);
+            cmd.param1 = 1;
+            _hw_monitor->send(cmd);
+        }
+        catch (...) {
+            // The set command returns a failure because switching to DFU resets the device while the command is running.
+        }
+    }
+
+    std::vector<uint8_t> ds5_device::backup_flash(update_progress_callback_ptr callback)
+    {
+        int flash_size = 1024 * 2048;
+        int max_bulk_size = 1016;
+        int max_iterations = int(flash_size / max_bulk_size + 1);
+
+        std::vector<uint8_t> flash;
+        flash.reserve(flash_size);
+
+        get_depth_sensor().invoke_powered([&](platform::uvc_device& dev)
+        {
+            for (int i = 0; i < max_iterations; i++)
+            {
+                int offset = max_bulk_size * i;
+                int size = max_bulk_size;
+                if (i == max_iterations - 1)
+                {
+                    size = flash_size - offset;
+                }
+
+                bool appended = false;
+
+                const int retries = 3;
+                for (int j = 0; j < retries && !appended; j++)
+                {
+                    try
+                    {
+                        command cmd(ds::FRB);
+                        cmd.param1 = offset;
+                        cmd.param2 = size;
+                        auto res = _hw_monitor->send(cmd);
+
+                        flash.insert(flash.end(), res.begin(), res.end());
+                        appended = true;
+                    }
+                    catch (...)
+                    {
+                        if (i < retries - 1) std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        else throw;
+                    }
+                }
+
+                if (callback) callback->on_update_progress((float)i / max_iterations);
+            }
+        });
+
+        return flash;
+    }
+
     class ds5_depth_sensor : public uvc_sensor, public video_sensor_interface, public depth_stereo_sensor, public roi_sensor_base
     {
     public:
@@ -94,10 +157,20 @@ namespace librealsense
 
         rs2_intrinsics get_intrinsics(const stream_profile& profile) const override
         {
-            return get_intrinsic_by_resolution(
-                *_owner->_coefficients_table_raw,
-                ds::calibration_table_id::coefficients_table_id,
-                profile.width, profile.height);
+            rs2_intrinsics result;
+            
+            if (ds::try_get_intrinsic_by_resolution_new(*_owner->_new_calib_table_raw,
+                profile.width, profile.height, &result))
+            {
+                return result;
+            }
+            else 
+            {
+                return get_intrinsic_by_resolution(
+                    *_owner->_coefficients_table_raw,
+                    ds::calibration_table_id::coefficients_table_id,
+                    profile.width, profile.height);
+            }
         }
 
         void open(const stream_profiles& requests) override
@@ -288,6 +361,16 @@ namespace librealsense
         return _hw_monitor->send(cmd);
     }
 
+    std::vector<uint8_t> ds5_device::get_new_calibration_table() const
+    {
+        if (_fw_version >= firmware_version("5.11.9.5"))
+        {
+            command cmd(ds::RECPARAMSGET);
+            return _hw_monitor->send(cmd);
+        }
+        return {};
+    }
+
     ds::d400_caps ds5_device::parse_device_capabilities() const
     {
         using namespace ds;
@@ -323,9 +406,13 @@ namespace librealsense
         for (auto&& info : filter_by_mi(all_device_infos, 0)) // Filter just mi=0, DEPTH
             depth_devices.push_back(backend.create_uvc_device(info));
 
-        std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_backup(new ds5_timestamp_reader(backend.create_time_service()));
+        std::unique_ptr<frame_timestamp_reader> timestamp_reader_backup(new ds5_timestamp_reader(backend.create_time_service()));
+        std::unique_ptr<frame_timestamp_reader> timestamp_reader_metadata(new ds5_timestamp_reader_from_metadata(std::move(timestamp_reader_backup)));
+        auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
         auto depth_ep = std::make_shared<ds5_depth_sensor>(this, std::make_shared<platform::multi_pins_uvc_device>(depth_devices),
-                                                       std::unique_ptr<frame_timestamp_reader>(new ds5_timestamp_reader_from_metadata(std::move(ds5_timestamp_reader_backup))));
+            std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(timestamp_reader_metadata), _tf_keeper, enable_global_time_option)));
+
+        depth_ep->register_option(RS2_OPTION_GLOBAL_TIME_ENABLED, enable_global_time_option);
         depth_ep->register_xu(depth_xu); // make sure the XU is initialized every time we power the camera
 
         depth_ep->register_pixel_format(pf_z16); // Depth
@@ -337,13 +424,13 @@ namespace librealsense
 
     ds5_device::ds5_device(std::shared_ptr<context> ctx,
                            const platform::backend_device_group& group)
-        : device(ctx, group),
+        : device(ctx, group), global_time_interface(), 
           _depth_stream(new stream(RS2_STREAM_DEPTH)),
           _left_ir_stream(new stream(RS2_STREAM_INFRARED, 1)),
           _right_ir_stream(new stream(RS2_STREAM_INFRARED, 2)),
-          _device_capabilities(ds::d400_caps::CAP_UNDEFINED),
-          _depth_device_idx(add_sensor(create_depth_device(ctx, group.uvc_devices)))
+          _device_capabilities(ds::d400_caps::CAP_UNDEFINED)
     {
+        _depth_device_idx = add_sensor(create_depth_device(ctx, group.uvc_devices));
         init(ctx, group);
     }
 
@@ -387,14 +474,24 @@ namespace librealsense
         register_stream_to_extrinsic_group(*_right_ir_stream, 0);
 
         _coefficients_table_raw = [this]() { return get_raw_calibration_table(coefficients_table_id); };
+        _new_calib_table_raw = [this]() { return get_new_calibration_table(); };
 
         auto pid = group.uvc_devices.front().pid;
         std::string device_name = (rs400_sku_names.end() != rs400_sku_names.find(pid)) ? rs400_sku_names.at(pid) : "RS4xx";
-        _fw_version = firmware_version(_hw_monitor->get_firmware_version_string(GVD, camera_fw_version_offset));
-        _recommended_fw_version = firmware_version("5.10.3.0");
+
+        std::vector<uint8_t> gvd_buff(HW_MONITOR_BUFFER_SIZE);
+        _hw_monitor->get_gvd(gvd_buff.size(), gvd_buff.data(), GVD);
+        // fooling tests recordings - don't remove
+        _hw_monitor->get_gvd(gvd_buff.size(), gvd_buff.data(), GVD);
+        
+        auto optic_serial = _hw_monitor->get_module_serial_string(gvd_buff, module_serial_offset);
+        auto asic_serial = _hw_monitor->get_module_serial_string(gvd_buff, module_asic_serial_offset);
+        auto fwv = _hw_monitor->get_firmware_version_string(gvd_buff, camera_fw_version_offset);
+        _fw_version = firmware_version(fwv);
+
+        _recommended_fw_version = firmware_version(D4XX_RECOMMENDED_FIRMWARE_VERSION);
         if (_fw_version >= firmware_version("5.10.4.0"))
             _device_capabilities = parse_device_capabilities();
-        auto serial = _hw_monitor->get_module_serial_string(GVD, module_serial_offset);
 
         auto& depth_ep = get_depth_sensor();
         auto advanced_mode = is_camera_in_advanced_mode();
@@ -575,44 +672,21 @@ namespace librealsense
         depth_ep.register_metadata((rs2_frame_metadata_value)RS2_FRAME_METADATA_ACTUAL_FPS,  std::make_shared<ds5_md_attribute_actual_fps> ());
 
         register_info(RS2_CAMERA_INFO_NAME, device_name);
-        register_info(RS2_CAMERA_INFO_SERIAL_NUMBER, serial);
+        register_info(RS2_CAMERA_INFO_SERIAL_NUMBER, optic_serial);
+        register_info(RS2_CAMERA_INFO_ASIC_SERIAL_NUMBER, asic_serial);
         register_info(RS2_CAMERA_INFO_FIRMWARE_VERSION, _fw_version);
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, group.uvc_devices.front().device_path);
         register_info(RS2_CAMERA_INFO_DEBUG_OP_CODE, std::to_string(static_cast<int>(fw_cmd::GLD)));
         register_info(RS2_CAMERA_INFO_ADVANCED_MODE, ((advanced_mode) ? "YES" : "NO"));
         register_info(RS2_CAMERA_INFO_PRODUCT_ID, pid_hex_str);
+        register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "D400");
         register_info(RS2_CAMERA_INFO_RECOMMENDED_FIRMWARE_VERSION, _recommended_fw_version);
 
         if (usb_modality)
             register_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR, usb_type_str);
 
         std::string curr_version= _fw_version;
-        std::string minimal_version = _recommended_fw_version;
 
-        if (_fw_version < _recommended_fw_version)
-        {
-            std::weak_ptr<notifications_processor> weak = depth_ep.get_notifications_processor();
-            std::thread notification_thread = std::thread([weak, curr_version, minimal_version]()
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                while (true)
-                {
-                    auto ptr = weak.lock();
-                    if (ptr)
-                    {
-                        std::string msg = "Current firmware version: " + curr_version + "\nMinimal firmware version: " + minimal_version +"\n";
-                        notification n(RS2_NOTIFICATION_CATEGORY_FIRMWARE_UPDATE_RECOMMENDED, 0, RS2_LOG_SEVERITY_INFO, msg);
-                        ptr->raise_notification(n);
-                    }
-                    else
-                    {
-                        break;
-                    }
-                    std::this_thread::sleep_for(std::chrono::hours(8));
-                }
-            });
-            notification_thread.detach();
-        }
     }
 
     notification ds5_notification_decoder::decode(int value)
@@ -645,6 +719,31 @@ namespace librealsense
         return platform::usb_undefined;
     }
 
+
+    double ds5_device::get_device_time_ms()
+    {
+        // TODO: Refactor the following query with an extension.
+        if (dynamic_cast<const platform::playback_backend*>(&(get_context()->get_backend())) != nullptr)
+        {
+            throw not_implemented_exception("device time not supported for backend.");
+        }
+
+        if (!_hw_monitor)
+            throw wrong_api_call_sequence_exception("_hw_monitor is not initialized yet");
+
+        command cmd(ds::MRD, ds::REGISTER_CLOCK_0, ds::REGISTER_CLOCK_0 + 4);
+        auto res = _hw_monitor->send(cmd);
+
+        if (res.size() < sizeof(uint32_t))
+        {
+            LOG_DEBUG("size(res):" << res.size());
+            throw std::runtime_error("Not enough bytes returned from the firmware!");
+        }
+        uint32_t dt = *(uint32_t*)res.data();
+        double ts = dt * TIMESTAMP_USEC_TO_MSEC;
+        return ts;
+    }
+
     std::shared_ptr<uvc_sensor> ds5u_device::create_ds5u_depth_device(std::shared_ptr<context> ctx,
         const std::vector<platform::uvc_device_info>& all_device_infos)
     {
@@ -657,8 +756,14 @@ namespace librealsense
             depth_devices.push_back(backend.create_uvc_device(info));
 
         std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_backup(new ds5_timestamp_reader(backend.create_time_service()));
+        std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_metadata(new ds5_timestamp_reader_from_metadata(std::move(ds5_timestamp_reader_backup)));
+
+        auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
         auto depth_ep = std::make_shared<ds5u_depth_sensor>(this, std::make_shared<platform::multi_pins_uvc_device>(depth_devices),
-                            std::unique_ptr<frame_timestamp_reader>(new ds5_timestamp_reader_from_metadata(std::move(ds5_timestamp_reader_backup))));
+                                std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds5_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)));
+
+        depth_ep->register_option(RS2_OPTION_GLOBAL_TIME_ENABLED, enable_global_time_option);
+
         depth_ep->register_xu(depth_xu); // make sure the XU is initialized every time we power the camera
 
         depth_ep->register_pixel_format(pf_z16); // Depth

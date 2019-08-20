@@ -34,6 +34,9 @@ public class SettingsActivity extends AppCompatActivity {
     private static final int INDEX_DEVICE_INFO = 0;
     private static final int INDEX_ADVANCE_MODE = 1;
     private static final int INDEX_PRESETS = 2;
+    private static final int INDEX_UPDATE = 3;
+
+    private Device _device;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,25 +51,44 @@ public class SettingsActivity extends AppCompatActivity {
         RsContext ctx = new RsContext();
         try(DeviceList devices = ctx.queryDevices()) {
             if (devices.getDeviceCount() == 0) {
-                return;
+                throw new Exception("Failed to detect a connected device");
             }
-            Device device = ctx.queryDevices().createDevice(0);
-            loadSettingsList(device);
-            StreamProfileSelector[] profilesList = createSettingList(device);
-            loadStreamList(device, profilesList);
+            _device = devices.createDevice(0);
+            loadInfosList();
+            loadSettingsList(_device);
+            StreamProfileSelector[] profilesList = createSettingList(_device);
+            loadStreamList(_device, profilesList);
         } catch(Exception e){
             Log.e(TAG, "failed to load settings, error: " + e.getMessage());
             Toast.makeText(this, "Failed to load settings", Toast.LENGTH_LONG).show();
             finish();
         }
     }
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (_device != null)
+            _device.close();
+    }
+
+    private void loadInfosList() {
+        final ListView listview = findViewById(R.id.info_list_view);
+        String appVersion = "Camera App Version: " + BuildConfig.VERSION_NAME;
+        String lrsVersion = "LibRealSense Version: " + RsContext.getVersion();
+
+        final String[] info = { lrsVersion, appVersion};
+        final ArrayAdapter adapter = new ArrayAdapter<>(this, R.layout.files_list_view, info);
+        listview.setAdapter(adapter);
+        adapter.notifyDataSetChanged();
+    }
 
     private void loadSettingsList(final Device device){
         final ListView listview = findViewById(R.id.settings_list_view);
 
-        Map<Integer,String> settingsMap = new TreeMap<>();
+        final Map<Integer,String> settingsMap = new TreeMap<>();
         settingsMap.put(INDEX_DEVICE_INFO,"Device info");
         settingsMap.put(INDEX_ADVANCE_MODE,"Enable advanced mode");
+        settingsMap.put(INDEX_UPDATE,"Firmware update");
 
         if(device.supportsInfo(CameraInfo.ADVANCED_MODE) && device.isInAdvancedMode()){
             settingsMap.put(INDEX_ADVANCE_MODE,"Disable advanced mode");
@@ -82,7 +104,8 @@ public class SettingsActivity extends AppCompatActivity {
             @Override
             public void onItemClick(AdapterView<?> parent, final View view,
                                     int position, long id) {
-                switch (position){
+                Object[] keys = settingsMap.keySet().toArray();
+                switch ((int)keys[position]){
                     case INDEX_DEVICE_INFO: {
                         Intent intent = new Intent(SettingsActivity.this, InfoActivity.class);
                         startActivity(intent);
@@ -95,8 +118,16 @@ public class SettingsActivity extends AppCompatActivity {
                         startActivity(intent);
                         break;
                     }
-                        default:
-                            break;
+                    case INDEX_UPDATE: {
+                        FirmwareUpdateDialog fud = new FirmwareUpdateDialog();
+                        Bundle bundle = new Bundle();
+                        bundle.putBoolean(getString(R.string.firmware_update_request), true);
+                        fud.setArguments(bundle);
+                        fud.show(getFragmentManager(), "fw_update_dialog");
+                        break;
+                    }
+                    default:
+                        break;
                 }
             }
         });
@@ -133,6 +164,8 @@ public class SettingsActivity extends AppCompatActivity {
     private void loadStreamList(Device device, StreamProfileSelector[] lines){
         if(lines == null)
             return;
+        if(!device.supportsInfo(CameraInfo.PRODUCT_ID))
+            throw new RuntimeException("try to config unknown device");
         final String pid = device.getInfo(CameraInfo.PRODUCT_ID);
         final StreamProfileAdapter adapter = new StreamProfileAdapter(this, lines, new StreamProfileAdapter.Listener() {
             @Override
@@ -155,8 +188,9 @@ public class SettingsActivity extends AppCompatActivity {
         Map<Integer, List<VideoStreamProfile>> profilesMap = createProfilesMap(device);
 
         SharedPreferences sharedPref = getSharedPreferences(getString(R.string.app_settings), Context.MODE_PRIVATE);
+        if(!device.supportsInfo(CameraInfo.PRODUCT_ID))
+            throw new RuntimeException("try to config unknown device");
         String pid = device.getInfo(CameraInfo.PRODUCT_ID);
-
         List<StreamProfileSelector> lines = new ArrayList<>();
         for(Map.Entry e : profilesMap.entrySet()){
             List<VideoStreamProfile> list = (List<VideoStreamProfile>) e.getValue();

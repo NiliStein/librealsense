@@ -1,6 +1,10 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
+#ifndef NOMINMAX
+    #define NOMINMAX
+#endif
+
 #include <memory>
 #include <thread>
 #include "tm-device.h"
@@ -16,6 +20,54 @@ using namespace std::chrono;
 
 namespace librealsense
 {
+    void SetManualExposure(TrackingDevice* device, uint32_t integrationTimeInMili, float gain)
+    {
+        TrackingData::Exposure::StreamExposure leftStreamExposure;
+
+        leftStreamExposure.cameraId = SET_SENSOR_ID(3, 0);
+        leftStreamExposure.gain = gain;
+        leftStreamExposure.integrationTime = integrationTimeInMili;
+
+        TrackingData::Exposure::StreamExposure rightStreamExposure;
+        rightStreamExposure.cameraId = SET_SENSOR_ID(3, 1);
+        rightStreamExposure.gain = gain;
+        rightStreamExposure.integrationTime = integrationTimeInMili;
+
+        TrackingData::Exposure exp;
+        exp.numOfVideoStreams = 2;
+        exp.stream[0] = leftStreamExposure;
+        exp.stream[1] = rightStreamExposure;
+
+        Status status = device->SetExposure(exp);
+
+        if (status != Status::SUCCESS)
+            throw std::runtime_error("Failed set manual exposure");
+    }
+
+
+    void SetExposureMode(TrackingDevice* device, bool manualMode)
+    {
+        if (manualMode)
+        {
+            // Cancel autoExposure
+            TrackingData::ExposureModeControl modeControl(0, 0);
+
+            Status status = device->SetExposureModeControl(modeControl);
+            if (status != Status::SUCCESS)
+                throw std::runtime_error("Failed set manual exposure mode");
+        }
+        else
+        {
+            TrackingData::ExposureModeControl modeControl(3, 0);
+
+            Status status = device->SetExposureModeControl(modeControl);
+
+            if (status != Status::SUCCESS)
+                throw std::runtime_error("Failed set manual exposure");
+        }
+    }
+
+
     struct video_frame_metadata
     {
         int64_t arrival_ts;
@@ -53,9 +105,107 @@ namespace librealsense
             _range(option_range{ 0, ep.get_temperature().sensor[type].threshold, 0, 0 }) { }
 
     private:
-        tm2_sensor & _ep;
-        option_range _range;
-        temperature_type _type;
+        tm2_sensor&         _ep;
+        temperature_type    _type;
+        option_range        _range;
+    };
+
+    class exposure_option : public option_base
+    {
+    public:
+        float query() const override
+        {
+            return _ep.get_exposure();
+        }
+
+        void set(float value) override
+        {
+            return _ep.set_exposure(value);
+        }
+
+        const char* get_description() const override { return "Exposure"; }
+
+        bool is_enabled() const override { return true; }
+
+        explicit exposure_option(tm2_sensor& ep) : _ep(ep),
+            option_base(option_range{ 200, 16000, 0, 200 }) { }
+
+    private:
+        tm2_sensor&         _ep;
+    };
+
+    class exposure_mode_option : public option_base
+    {
+    public:
+        float query() const override
+        {
+            return 1.f - _ep.is_manual_exposure();
+        }
+
+        void set(float value) override
+        {
+            return _ep.set_manual_exposure(1.f - value);
+        }
+
+        const char* get_description() const override { return "Auto-Exposure"; }
+
+        bool is_enabled() const override { return true; }
+
+        explicit exposure_mode_option(tm2_sensor& ep) : _ep(ep),
+            option_base(option_range{ 0, 1, 1, 1 }) { }
+
+    private:
+        tm2_sensor&         _ep;
+    };
+
+    class gain_option : public option_base
+    {
+    public:
+        float query() const override
+        {
+            return _ep.get_gain();
+        }
+
+        void set(float value) override
+        {
+            return _ep.set_gain(value);
+        }
+
+        const char* get_description() const override { return "Gain"; }
+
+        bool is_enabled() const override { return true; }
+
+        explicit gain_option(tm2_sensor& ep) : _ep(ep),
+            option_base(option_range{ 1, 10, 0, 1 }) { }
+
+    private:
+        tm2_sensor&         _ep;
+    };
+
+    template <perc::SIXDOF_MODE flag, perc::SIXDOF_MODE depends_on, bool invert = false>
+    class tracking_mode_option : public option_base
+    {
+    public:
+        float query() const override { return !!(s._tm_mode & flag) ^ invert ? 1 : 0; }
+
+        void set(float value) override {
+            if (s._is_streaming)
+                throw io_exception("Option is read-only while streaming");
+            s._tm_mode = (!!value ^ invert) ? (s._tm_mode | flag) : (s._tm_mode & ~flag);
+        }
+
+        const char* get_description() const override { return description; }
+
+        bool is_enabled() const override { return !depends_on || (s._tm_mode & depends_on) ? true : false; }
+
+        bool is_read_only() const override { return s._is_streaming; }
+
+        explicit tracking_mode_option(tm2_sensor& sensor, const char *description_) :
+            s(sensor), description(description_), option_base(option_range{ 0, 1, !!(sensor._tm_mode & flag) ^ invert ? 1.f : 0.f, 1 }) { }
+
+    private:
+        tm2_sensor &s;
+        const char *description;
     };
 
     class asic_temperature_option : public temperature_option
@@ -102,7 +252,6 @@ namespace librealsense
                 {
                     return (rs2_metadata_type)(vf->additional_data.system_time);
                 }
-                
                 if (auto* mf = dynamic_cast<const motion_frame*>(&frm))
                 {
                     return (rs2_metadata_type)(mf->additional_data.system_time);
@@ -110,6 +259,21 @@ namespace librealsense
                 if (auto* pf = dynamic_cast<const pose_frame*>(&frm))
                 {
                     return (rs2_metadata_type)(pf->additional_data.system_time);
+                }
+            }
+            if(_type == RS2_FRAME_METADATA_FRAME_TIMESTAMP)
+            {
+                if (auto* vf = dynamic_cast<const video_frame*>(&frm))
+                {
+                    return (rs2_metadata_type)(vf->additional_data.timestamp*1e+3);
+                }
+                if (auto* mf = dynamic_cast<const motion_frame*>(&frm))
+                {
+                    return (rs2_metadata_type)(mf->additional_data.timestamp*1e+3);
+                }
+                if (auto* pf = dynamic_cast<const pose_frame*>(&frm))
+                {
+                    return (rs2_metadata_type)(pf->additional_data.timestamp*1e+3);
                 }
             }
             if (_type == RS2_FRAME_METADATA_TEMPERATURE)
@@ -137,6 +301,10 @@ namespace librealsense
             {
                 return dynamic_cast<const video_frame*>(&frm) != nullptr || dynamic_cast<const motion_frame*>(&frm) != nullptr;
             }
+            if (_type == RS2_FRAME_METADATA_FRAME_TIMESTAMP)
+            {
+                return (dynamic_cast<const video_frame*>(&frm) != nullptr) || (dynamic_cast<const motion_frame*>(&frm) != nullptr) || (dynamic_cast<const pose_frame*>(&frm) != nullptr);
+            }
             return false;
         }
     private:
@@ -149,12 +317,13 @@ namespace librealsense
     }
 
     tm2_sensor::tm2_sensor(tm2_device* owner, perc::TrackingDevice* dev)
-        : sensor_base("Tracking Module", owner, this), _tm_dev(dev), _dispatcher(10)
+        : sensor_base("Tracking Module", owner, this), _dispatcher(10), _tm_dev(dev)
     {
         register_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE, std::make_shared<md_tm2_parser>(RS2_FRAME_METADATA_ACTUAL_EXPOSURE));
         register_metadata(RS2_FRAME_METADATA_TEMPERATURE    , std::make_shared<md_tm2_parser>(RS2_FRAME_METADATA_TEMPERATURE));
         //Replacing md parser for RS2_FRAME_METADATA_TIME_OF_ARRIVAL
         _metadata_parsers->operator[](RS2_FRAME_METADATA_TIME_OF_ARRIVAL) = std::make_shared<md_tm2_parser>(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
+        _metadata_parsers->operator[](RS2_FRAME_METADATA_FRAME_TIMESTAMP) = std::make_shared<md_tm2_parser>(RS2_FRAME_METADATA_FRAME_TIMESTAMP);
     }
 
     tm2_sensor::~tm2_sensor()
@@ -186,7 +355,6 @@ namespace librealsense
     stream_profiles tm2_sensor::init_stream_profiles()
     {
         stream_profiles results;
-        int uid = 0;
 
         //get TM2 profiles
         Status status = _tm_dev->GetSupportedProfile(_tm_supported_profiles);
@@ -288,7 +456,7 @@ namespace librealsense
             auto profile = std::make_shared<pose_stream_profile>(platform::stream_profile{ 0, 0, fps, static_cast<uint32_t>(format) });
             profile->set_stream_type(RS2_STREAM_POSE);
             // TM2_API - 6dof profile type enum behaves the same as stream index
-            profile->set_stream_index(static_cast<uint32_t>(tm_profile.profileType));
+            profile->set_stream_index(static_cast<int32_t>(tm_profile.profileType));
             profile->set_format(format);
             profile->set_framerate(fps);
             profile->set_unique_id(environment::get_instance().generate_stream_id());
@@ -308,6 +476,13 @@ namespace librealsense
             auto current_extrinsics = get_extrinsics(*profile, current_reference);
             environment::get_instance().get_extrinsics_graph().register_extrinsics(*profile, *(profile_map[current_reference]), current_extrinsics);
         }
+
+        auto accel_it = std::find_if(results.begin(), results.end(),
+            [](std::shared_ptr<stream_profile_interface> spi) { return RS2_STREAM_ACCEL == spi->get_stream_type(); });
+        auto gyro_it = std::find_if(results.begin(), results.end(),
+            [](std::shared_ptr<stream_profile_interface> spi) { return RS2_STREAM_GYRO == spi->get_stream_type(); });
+        if ((accel_it != results.end()) && (gyro_it != results.end()))
+            environment::get_instance().get_extrinsics_graph().register_same_extrinsics(*(accel_it->get()), *(gyro_it->get()));
 
         return results;
     }
@@ -437,6 +612,7 @@ namespace librealsense
             case RS2_STREAM_POSE:
             {
                 auto tm_profile = _tm_supported_profiles.sixDof[stream_index];
+                tm_profile.mode = _tm_mode;
                 if (convertTm2InterruptRate(tm_profile.interruptRate) == sp.fps)
                 {
                     _tm_active_profiles.set(tm_profile, true);
@@ -476,6 +652,8 @@ namespace librealsense
 
         _is_opened = false;
         set_active_streams({});
+
+        manual_exposure = 0;
     }
 
     void tm2_sensor::pass_frames_to_fw(frame_holder fref)
@@ -498,14 +676,13 @@ namespace librealsense
             LOG_ERROR("Failed to convert lrs stream " << lrs_stream << " to tm stream");
             return;
         }
-        auto time_of_arrival = get_md_or_default(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
 
-
-        //Pass frames to firmeware
+        //Pass frames to firmware
         if (auto vframe = As<video_frame>(fref.frame))
         {
             TrackingData::VideoFrame f = {};
             f.sensorIndex = stream_index;
+            //TODO: Librealsense frame numbers are 64 bit. This is a potentional interface gap
             f.frameId = vframe->additional_data.frame_number;
             f.profile.set(vframe->get_width(), vframe->get_height(), vframe->get_stride(), convertToTm2PixelFormat(vframe->get_stream()->get_format()));
             f.exposuretime = get_md_or_default(RS2_FRAME_METADATA_ACTUAL_EXPOSURE);
@@ -684,7 +861,7 @@ namespace librealsense
     rs2_extrinsics tm2_sensor::get_extrinsics(const stream_profile_interface & profile, perc::SensorId & reference_sensor_id) const
     {
 
-        rs2_extrinsics result{0};
+        rs2_extrinsics result{};
         TrackingData::SensorExtrinsics tm_extrinsics{};
         int stream_index = profile.get_stream_index();
         SensorType type = SensorType::Max;
@@ -747,9 +924,12 @@ namespace librealsense
         duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
         auto arr_ts_double_nanos = duration<double, std::nano>(tm_frame.arrivalTimeStamp);
         duration<double, std::milli> arrival_ts_ms(arr_ts_double_nanos);
-        video_frame_metadata video_md = { 0 };
+        video_frame_metadata video_md{};
         video_md.arrival_ts = tm_frame.arrivalTimeStamp;
         video_md.exposure_time = tm_frame.exposuretime;
+
+        last_exposure = tm_frame.exposuretime;
+        last_gain = tm_frame.gain;
 
         frame_additional_data additional_data(ts_ms.count(), tm_frame.frameId, arrival_ts_ms.count(), sizeof(video_md), (uint8_t*)&video_md, system_ts_ms.count(), 0 ,0, false);
 
@@ -783,7 +963,7 @@ namespace librealsense
             auto video = (video_frame*)(frame.frame);
             video->assign(tm_frame.profile.width, tm_frame.profile.height, tm_frame.profile.stride, bpp);
             frame->set_timestamp(system_ts_ms.count());
-            frame->set_timestamp_domain(RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME);
+            frame->set_timestamp_domain(RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME);
             frame->set_stream(profile);
             frame->set_sensor(this->shared_from_this()); //TODO? uvc doesn't set it?
             video->data.assign(tm_frame.data, tm_frame.data + (tm_frame.profile.height * tm_frame.profile.stride));
@@ -864,7 +1044,7 @@ namespace librealsense
         {
             auto pose_frame = static_cast<librealsense::pose_frame*>(frame.frame);
             frame->set_timestamp(system_ts_ms.count());
-            frame->set_timestamp_domain(RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME);
+            frame->set_timestamp_domain(RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME);
             frame->set_stream(profile);
 
             auto info = reinterpret_cast<librealsense::pose_frame::pose_info*>(pose_frame->data.data());
@@ -941,9 +1121,7 @@ namespace librealsense
     void tm2_sensor::onRelocalizationEvent(perc::TrackingData::RelocalizationEvent& evt)
     {
         std::string msg = to_string() << "T2xx: Relocalization occurred. id: " << evt.sessionId <<  ", timestamp: " << double(evt.timestamp*0.000000001) << " sec";
-        // TODO: Modify the firmware to correctly raise notifications
-        // As a temporary work-around, block notifications at the software level
-        //raise_hardware_event(msg, {}, evt.timestamp);
+        raise_hardware_event(msg, {}, evt.timestamp);
     }
 
     void tm2_sensor::enable_loopback(std::shared_ptr<playback_device> input)
@@ -973,7 +1151,7 @@ namespace librealsense
         duration<double, std::milli> system_ts_ms(sys_ts_double_nanos);
         auto arr_ts_double_nanos = duration<double, std::nano>(tm_frame_ts.arrivalTimeStamp);
         duration<double, std::milli> arrival_ts_ms(arr_ts_double_nanos);
-        motion_frame_metadata motion_md = { 0 };
+        motion_frame_metadata motion_md{};
         motion_md.arrival_ts = tm_frame_ts.arrivalTimeStamp;
         motion_md.temperature = temperature;
 
@@ -1003,7 +1181,7 @@ namespace librealsense
         {
             auto motion_frame = static_cast<librealsense::motion_frame*>(frame.frame);
             frame->set_timestamp(system_ts_ms.count());
-            frame->set_timestamp_domain(RS2_TIMESTAMP_DOMAIN_SYSTEM_TIME);
+            frame->set_timestamp_domain(RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME);
             frame->set_stream(profile);
             auto data = reinterpret_cast<float*>(motion_frame->data.data());
             data[0] = imu_data[0];
@@ -1157,11 +1335,12 @@ namespace librealsense
         rp.rotation     = { orient_quat.x, orient_quat.y, orient_quat.z, orient_quat.w };
 
         auto status = _tm_dev->SetStaticNode(guid.data(), rp);
-        if (status != Status::SUCCESS)
-        {
-            LOG_WARNING("Set static node failed, status =" << (uint32_t)status);
-        }
-        return (status == Status::SUCCESS);
+        if (status == Status::SUCCESS)
+            return true;
+        if (status == Status::ERROR_FW_INTERNAL) // non-fatal; just means the confidence was not high enough
+            return false;
+
+        throw io_exception(to_string() << "Unexpected error setting static node, status = " << (uint32_t)status);
     }
 
     bool tm2_sensor::get_static_node(const std::string& guid, float3& pos, float4& orient_quat) const
@@ -1171,6 +1350,8 @@ namespace librealsense
 
         perc::TrackingData::RelativePose rel_pose;
         auto status = _tm_dev->GetStaticNode(guid.data(), rel_pose);
+        if (status == Status::ERROR_FW_INTERNAL) // non-fatal; just means the node is not available
+            return false;
         if (status == perc::Status::SUCCESS)
         {
             pos[0] = rel_pose.translation.x;
@@ -1180,12 +1361,10 @@ namespace librealsense
             orient_quat[1] = rel_pose.rotation.j;
             orient_quat[2] = rel_pose.rotation.k;
             orient_quat[3] = rel_pose.rotation.r;
+            return true;
         }
-        else
-        {
-            LOG_WARNING("Get static node failed, status =" << (uint32_t)status);
-        }
-        return (status == Status::SUCCESS);
+
+        throw io_exception(to_string() << "Unexpected error getting static node, status = " << (uint32_t)status);
     }
 
 
@@ -1235,6 +1414,40 @@ namespace librealsense
         return temperature;
     }
 
+    void tm2_sensor::set_exposure(float value)
+    {
+        if (!manual_exposure)
+            throw std::runtime_error("To control exposure you must set sensor to manual exposure mode prior to streaming");
+        SetManualExposure(_tm_dev, value, last_gain);
+        last_exposure = value;
+    }
+
+
+
+    float tm2_sensor::get_exposure() const
+    {
+        return last_exposure;
+    }
+
+    void tm2_sensor::set_gain(float value)
+    {
+        if (!manual_exposure)
+            throw std::runtime_error("To control gain you must set sensor to manual exposure mode prior to streaming");
+        SetManualExposure(_tm_dev, last_exposure, value);
+        last_gain = value;
+    }
+
+    float tm2_sensor::get_gain() const
+    {
+        return last_gain;
+    }
+
+    void tm2_sensor::set_manual_exposure(bool manual)
+    {
+        SetExposureMode(_tm_dev, manual);
+        manual_exposure = true;
+    }
+
     ///////////////
     // Device
 
@@ -1244,8 +1457,8 @@ namespace librealsense
             std::shared_ptr<context> ctx,
             const platform::backend_device_group& group) :
         device(ctx, group),
-        _dev(dev),
-        _manager(manager)
+        _manager(manager),
+        _dev(dev)
     {
         TrackingData::DeviceInfo info;
         auto status = dev->GetDeviceInfo(info);
@@ -1261,6 +1474,7 @@ namespace librealsense
         register_info(RS2_CAMERA_INFO_SERIAL_NUMBER, to_string() << std::hex << (info.serialNumber >> 16));
         register_info(RS2_CAMERA_INFO_FIRMWARE_VERSION, to_string() << info.version.fw.major << "." << info.version.fw.minor << "." << info.version.fw.patch << "." << info.version.fw.build);
         register_info(RS2_CAMERA_INFO_PRODUCT_ID, productIdStr);
+        register_info(RS2_CAMERA_INFO_PRODUCT_LINE, "T200");
 
         std::string device_path = std::string("vid_") + vendorIdStr + std::string(" pid_") + productIdStr + std::string(" bus_") + std::to_string(info.usbDescriptor.bus) + std::string(" port_") + std::to_string(info.usbDescriptor.port);
         register_info(RS2_CAMERA_INFO_PHYSICAL_PORT, device_path);
@@ -1270,6 +1484,20 @@ namespace librealsense
 
         _sensor->register_option(rs2_option::RS2_OPTION_ASIC_TEMPERATURE, std::make_shared<asic_temperature_option>(*_sensor));
         _sensor->register_option(rs2_option::RS2_OPTION_MOTION_MODULE_TEMPERATURE, std::make_shared<motion_temperature_option>(*_sensor));
+
+        _sensor->register_option(rs2_option::RS2_OPTION_EXPOSURE, std::make_shared<exposure_option>(*_sensor));
+        _sensor->register_option(rs2_option::RS2_OPTION_GAIN, std::make_shared<gain_option>(*_sensor));
+        _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_AUTO_EXPOSURE, std::make_shared<exposure_mode_option>(*_sensor));
+
+        _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_MAPPING,             std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_ENABLE_MAPPING,              perc::SIXDOF_MODE_NORMAL,         false>>(*_sensor, "Use an on device map (recommended)"));
+        _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_RELOCALIZATION,      std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_ENABLE_RELOCALIZATION,       perc::SIXDOF_MODE_ENABLE_MAPPING, false>>(*_sensor, "Use appearance based relocalization (depends on mapping)"));
+        _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_POSE_JUMPING,        std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_DISABLE_JUMPING,             perc::SIXDOF_MODE_ENABLE_MAPPING,  true>>(*_sensor, "Allow pose jumping (depends on mapping)"));
+        _sensor->register_option(rs2_option::RS2_OPTION_ENABLE_DYNAMIC_CALIBRATION, std::make_shared<tracking_mode_option<perc::SIXDOF_MODE_DISABLE_DYNAMIC_CALIBRATION, perc::SIXDOF_MODE_NORMAL,          true>>(*_sensor, "Enable dynamic calibration (recommended)"));
+
+        // Assing the extrinsic nodes to the default group
+        auto tm2_profiles = _sensor->get_stream_profiles();
+        for (auto && pf : tm2_profiles)
+            register_stream_to_extrinsic_group(*pf, 0);
 
         //For manual testing: enable_loopback("C:\\dev\\recording\\tm2.bag");
     }

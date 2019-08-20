@@ -41,17 +41,6 @@ namespace librealsense
         return res;
     }
 
-
-    std::string datetime_string()
-    {
-        auto t = time(nullptr);
-        char buffer[20] = {};
-        const tm* time = localtime(&t);
-        if (nullptr != time)
-            strftime(buffer, sizeof(buffer), "%Y-%m-%d-%H_%M_%S", time);
-        return to_string() << buffer;
-    }
-
     recoverable_exception::recoverable_exception(const std::string& msg,
         rs2_exception_type exception_type) noexcept
         : librealsense_exception(msg, exception_type)
@@ -191,6 +180,9 @@ namespace librealsense
             CASE(POSE)
             CASE(POSE_SENSOR)
             CASE(WHEEL_ODOMETER)
+            CASE(UPDATABLE)
+            CASE(UPDATE_DEVICE)
+            CASE(GLOBAL_TIMER)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -283,7 +275,13 @@ namespace librealsense
             CASE(LLD_TEMPERATURE)
             CASE(MC_TEMPERATURE)
             CASE(MA_TEMPERATURE)
+            CASE(APD_TEMPERATURE)
             CASE(HARDWARE_PRESET)
+            CASE(GLOBAL_TIME_ENABLED)
+            CASE(ENABLE_MAPPING)
+            CASE(ENABLE_RELOCALIZATION)
+            CASE(ENABLE_POSE_JUMPING)
+            CASE(ENABLE_DYNAMIC_CALIBRATION)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -315,6 +313,7 @@ namespace librealsense
             CASE(GPIO_RAW)
             CASE(6DOF)
             CASE(Y10BPACK)
+            CASE(DISTANCE)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -350,7 +349,9 @@ namespace librealsense
             CASE(ADVANCED_MODE)
             CASE(PRODUCT_ID)
             CASE(CAMERA_LOCKED)
+            CASE(PRODUCT_LINE)
             CASE(USB_TYPE_DESCRIPTOR)
+            CASE(ASIC_SERIAL_NUMBER)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -403,6 +404,7 @@ namespace librealsense
         {
             CASE(HARDWARE_CLOCK)
             CASE(SYSTEM_TIME)
+            CASE(GLOBAL_TIME)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE

@@ -30,10 +30,10 @@ Windows users can install the RealSense SDK 2.0 from the release tab to get pre-
 2. Install Python and its development files via apt-get (Python 2 and 3 both work)
   * `sudo apt-get install python python-dev` or `sudo apt-get install python3 python3-dev`
   * **Note:** The project will only use Python 2 if it can't use Python 3
-3. Run the top level CMake command with the following additional flag `-DBUILD_PYTHON_BINDINGS=bool:true`:
+3. Run the top level CMake command with the following additional flag `-DBUILD_PYTHON_BINDINGS:bool=true`:
   * `mkdir build`
   * `cd build`
-  * `cmake ../ -DBUILD_PYTHON_BINDINGS=bool:true`
+  * `cmake ../ -DBUILD_PYTHON_BINDINGS:bool=true`
 > **Note**: To force compilation with a specific version on a system with both Python 2 and Python 3 installed, add the following flag to CMake command:
 `-DPYTHON_EXECUTABLE=[full path to the exact python executable]`
   * `make -j4`
@@ -66,11 +66,11 @@ For example: `-DPYTHON_EXECUTABLE=C:/Python27/python.exe`
 # First import the library
 import pyrealsense2 as rs
 
-try:
-    # Create a context object. This object owns the handles to all connected realsense devices
-    pipeline = rs.pipeline()
-    pipeline.start()
+# Create a context object. This object owns the handles to all connected realsense devices
+pipeline = rs.pipeline()
+pipeline.start()
 
+try:
     while True:
         # Create a pipeline object. This object configures the streaming camera and owns it's handle
         frames = pipeline.wait_for_frames()
@@ -91,6 +91,9 @@ try:
                     line += " .:nhBXWW"[c/25]
                 coverage = [0]*64
                 print(line)
+
+finally:
+    pipeline.stop()
 ```
 
 #### NumPy Integration

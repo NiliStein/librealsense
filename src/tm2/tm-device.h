@@ -23,7 +23,7 @@ namespace librealsense
             perc::TrackingDevice* dev,
             std::shared_ptr<context> ctx,
             const platform::backend_device_group& group);
-        ~tm2_device();
+        virtual ~tm2_device();
 
         void enable_loopback(const std::string& source_file) override;
         void disable_loopback() override;
@@ -51,7 +51,7 @@ namespace librealsense
     {
     public:
         tm2_sensor(tm2_device* owner, perc::TrackingDevice* dev);
-        ~tm2_sensor();
+        virtual ~tm2_sensor();
 
         // sensor interface
         ////////////////////
@@ -84,6 +84,12 @@ namespace librealsense
         void detach_controller(int id);
         void dispose();
         perc::TrackingData::Temperature get_temperature();
+        void set_exposure(float value);
+        float get_exposure() const;
+        void set_gain(float value);
+        float get_gain() const;
+        bool is_manual_exposure() const { return manual_exposure; }
+        void set_manual_exposure(bool manual);
 
         // Pose interfaces
         bool export_relocalization_map(std::vector<uint8_t>& lmap_buf) const override;
@@ -124,8 +130,15 @@ namespace librealsense
         std::shared_ptr<playback_device>_loopback;
         perc::TrackingData::Profile     _tm_supported_profiles;
         perc::TrackingData::Profile     _tm_active_profiles;
+        perc::SIXDOF_MODE               _tm_mode = perc::SIXDOF_MODE_ENABLE_MAPPING | perc::SIXDOF_MODE_ENABLE_RELOCALIZATION;
         mutable std::condition_variable _async_op;
         mutable async_op_state          _async_op_status;
         mutable std::vector<uint8_t>    _async_op_res_buffer;
+
+        float last_exposure = 200.f;
+        float last_gain = 1.f;
+        bool manual_exposure = false;
+
+        template <perc::SIXDOF_MODE flag, perc::SIXDOF_MODE depends_on, bool invert> friend class tracking_mode_option;
     };
 }

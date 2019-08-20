@@ -69,7 +69,7 @@ template<typename T> T rad2deg(T val) { return T(val * r2d); }
 
 namespace librealsense
 {
-    static const double TIMESTAMP_USEC_TO_MSEC = 0.001f;
+    static const double TIMESTAMP_USEC_TO_MSEC = 0.001;
 
     ///////////////////////////////////
     // Utility types for general use //
@@ -391,6 +391,16 @@ namespace librealsense
             return *this;
         }
 
+        void reset() const
+        {
+            std::lock_guard<std::mutex> lock(_mtx);
+            if (_was_init)
+            {
+                _ptr.reset();
+                _was_init = false;
+            }
+        }
+
     private:
         T* operate() const
         {
@@ -450,7 +460,7 @@ namespace librealsense
     /////////////////////////////
 
 
-#define RS2_ENUM_HELPERS(TYPE, PREFIX) const char* get_string(TYPE value); \
+#define RS2_ENUM_HELPERS(TYPE, PREFIX) LRS_EXTENSION_API const char* get_string(TYPE value); \
         inline bool is_valid(TYPE value) { return value >= 0 && value < RS2_##PREFIX##_COUNT; } \
         inline std::ostream & operator << (std::ostream & out, TYPE value) { if(is_valid(value)) return out << get_string(value); else return out << (int)value; } \
         inline bool try_parse(const std::string& str, TYPE& res)       \
@@ -542,6 +552,26 @@ namespace librealsense
         return true;
     }
     inline rs2_extrinsics inverse(const rs2_extrinsics& a) { auto p = to_pose(a); return from_pose(inverse(p)); }
+
+    inline std::ostream& operator <<(std::ostream& stream, const float3& elem)
+    {
+        return stream << elem.x << " " << elem.y << " " << elem.z;
+    }
+
+    inline std::ostream& operator <<(std::ostream& stream, const float4& elem)
+    {
+        return stream << elem.x << " " << elem.y << " " << elem.z << " " << elem.w;
+    }
+
+    inline std::ostream& operator <<(std::ostream& stream, const float3x3& elem)
+    {
+        return stream << elem.x << "\n" << elem.y << "\n" << elem.z;
+    }
+
+    inline std::ostream& operator <<(std::ostream& stream, const pose& elem)
+    {
+        return stream << "Position:\n " << elem.position  << "\n Orientation :\n" << elem.orientation;
+    }
 
     ///////////////////
     // Pixel formats //
@@ -943,11 +973,35 @@ namespace librealsense
         void release() override { delete this; }
     };
 
+    class update_progress_callback : public rs2_update_progress_callback
+    {
+        rs2_update_progress_callback_ptr _nptr;
+        void* _client_data;
+    public:
+        update_progress_callback() {}
+        update_progress_callback(rs2_update_progress_callback_ptr on_update_progress, void* client_data = NULL)
+        : _nptr(on_update_progress), _client_data(client_data){}
+
+        operator bool() const { return _nptr != nullptr; }
+        void on_update_progress(const float progress) {
+            if (_nptr)
+            {
+                try { _nptr(progress, _client_data); }
+                catch (...)
+                {
+                    LOG_ERROR("Received an exception from firmware update progress callback!");
+                }
+            }
+        }
+        void release() { delete this; }
+    };
+
     typedef std::unique_ptr<rs2_log_callback, void(*)(rs2_log_callback*)> log_callback_ptr;
     typedef std::shared_ptr<rs2_frame_callback> frame_callback_ptr;
     typedef std::shared_ptr<rs2_frame_processor_callback> frame_processor_callback_ptr;
     typedef std::shared_ptr<rs2_notifications_callback> notifications_callback_ptr;
     typedef std::shared_ptr<rs2_devices_changed_callback> devices_changed_callback_ptr;
+    typedef std::shared_ptr<rs2_update_progress_callback> update_progress_callback_ptr;
 
     using internal_callback = std::function<void(rs2_device_list* removed, rs2_device_list* added)>;
     class devices_changed_callback_internal : public rs2_devices_changed_callback
@@ -1386,7 +1440,15 @@ namespace librealsense
         return std::find_if(data.begin(), data.end(), [](byte b){ return b!=0; }) != data.end();
     }
 
-    std::string datetime_string();
+    inline std::string datetime_string()
+    {
+        auto t = time(nullptr);
+        char buffer[20] = {};
+        const tm* time = localtime(&t);
+        if (nullptr != time)
+            strftime(buffer, sizeof(buffer), "%Y-%m-%d-%H_%M_%S", time);
+        return to_string() << buffer;
+    }
 
     bool file_exists(const char* filename);
 
@@ -1648,6 +1710,17 @@ namespace librealsense
         bool _valid;
         T _value;
     };
+
+}
+
+template<typename T>
+uint32_t rs_fourcc(const T a, const T b, const  T c, const T d)
+{
+    static_assert((std::is_integral<T>::value), "rs_fourcc supports integral built-in types only");
+    return ((static_cast<uint32_t>(a) << 24) |
+            (static_cast<uint32_t>(b) << 16) |
+            (static_cast<uint32_t>(c) << 8) |
+            (static_cast<uint32_t>(d) << 0));
 }
 
 namespace std {

@@ -11,6 +11,7 @@ import com.intel.realsense.librealsense.Device;
 import com.intel.realsense.librealsense.DeviceList;
 import com.intel.realsense.librealsense.FrameSet;
 import com.intel.realsense.librealsense.Pipeline;
+import com.intel.realsense.librealsense.ProductLine;
 import com.intel.realsense.librealsense.RsContext;
 import com.intel.realsense.librealsense.VideoStreamProfile;
 
@@ -55,19 +56,32 @@ public class Streamer {
         }
     };
 
+    private int getFirstFrameTimeout() {
+        RsContext ctx = new RsContext();
+        try(DeviceList devices = ctx.queryDevices()) {
+            if (devices.getDeviceCount() == 0) {
+                return 0;
+            }
+            try (Device device = devices.createDevice(0)) {
+                ProductLine pl = ProductLine.valueOf(device.getInfo(CameraInfo.PRODUCT_LINE));
+                return pl == ProductLine.L500 ? 15000 : 3000;
+            }
+        }
+    }
+
     private void configStream(Config config){
         config.disableAllStreams();
         RsContext ctx = new RsContext();
+        String pid;
+        Map<Integer, List<VideoStreamProfile>> profilesMap;
         try(DeviceList devices = ctx.queryDevices()) {
             if (devices.getDeviceCount() == 0) {
                 return;
             }
-        }
-        String pid;
-        Map<Integer, List<VideoStreamProfile>> profilesMap;
-        try(Device device = ctx.queryDevices().createDevice(0)){
-            pid = device.getInfo(CameraInfo.PRODUCT_ID);
-            profilesMap = SettingsActivity.createProfilesMap(device);
+            try (Device device = devices.createDevice(0)) {
+                pid = device.getInfo(CameraInfo.PRODUCT_ID);
+                profilesMap = SettingsActivity.createProfilesMap(device);
+            }
         }
 
         SharedPreferences sharedPref = mContext.getSharedPreferences(mContext.getString(R.string.app_settings), Context.MODE_PRIVATE);
@@ -103,7 +117,8 @@ public class Streamer {
             mPipeline = new Pipeline();
             Log.d(TAG, "try start streaming");
             configAndStart();
-            try(FrameSet frames = mPipeline.waitForFrames(15000)){} // w/a for l500
+            int firstFrameTimeOut = getFirstFrameTimeout();
+            try(FrameSet frames = mPipeline.waitForFrames(firstFrameTimeOut)){} // w/a for l500
             mIsStreaming = true;
             mHandler.post(mStreaming);
             Log.d(TAG, "streaming started successfully");

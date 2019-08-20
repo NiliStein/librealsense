@@ -19,11 +19,13 @@ namespace librealsense
     {
         // L500 depth XU identifiers
         const uint8_t L500_HWMONITOR = 1;
-        const uint8_t L500_DEPTH_LASER_POWER = 2;
+        const uint8_t L500_DEPTH_VISUAL_PRESET = 2;
         const uint8_t L500_ERROR_REPORTING = 3;
 
         const platform::extension_unit depth_xu = { 0, 3, 2,
         { 0xC9606CCB, 0x594C, 0x4D25,{ 0xaf, 0x47, 0xcc, 0xc4, 0x96, 0x43, 0x59, 0x95 } } };
+
+        const int REGISTER_CLOCK_0 = 0x9003021c;
 
         enum fw_cmd : uint8_t
         {
@@ -41,7 +43,8 @@ namespace librealsense
         enum gvd_fields
         {
             fw_version_offset = 12,
-            module_serial_offset = 56,
+            module_serial_offset = 56, 
+            module_asic_serial_offset = 72,
             module_serial_size = 8
         };
 
@@ -135,7 +138,7 @@ namespace librealsense
             uint16_t reserved16;
             uint8_t reserved8;
             uint8_t num_of_resolutions;
-            intrinsic_per_resolution intrinsic_resolution[NUM_OF_DEPTH_RESOLUTIONS]; //Dynamic number of entries according to numOfResolutions
+            intrinsic_per_resolution intrinsic_resolution[NUM_OF_DEPTH_RESOLUTIONS]; //Dynamic number of entries according to num of resolutions
         };
 
         struct orientation
@@ -158,7 +161,7 @@ namespace librealsense
             uint16_t reserved16;
             uint8_t reserved8;
             uint8_t num_of_resolutions;
-            pinhole_camera_model intrinsic_resolution[NUM_OF_RGB_RESOLUTIONS]; //Dynamic number of entries according to numOfResolutions
+            pinhole_camera_model intrinsic_resolution[NUM_OF_RGB_RESOLUTIONS]; //Dynamic number of entries according to num of resolutions
         };
 
         struct rgb_common

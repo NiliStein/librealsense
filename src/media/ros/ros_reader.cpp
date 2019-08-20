@@ -1,6 +1,7 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2019 Intel Corporation. All Rights Reserved.
 
+#include <cstring>
 #include "ros_reader.h"
 #include "ds5/ds5-device.h"
 #include "ivcam/sr300.h"
@@ -18,11 +19,11 @@ namespace librealsense
     using namespace device_serializer;
 
     ros_reader::ros_reader(const std::string& file, const std::shared_ptr<context>& ctx) :
+        m_metadata_parser_map(md_constant_parser::create_metadata_parser_map()),
         m_total_duration(0),
         m_file_path(file),
         m_context(ctx),
-        m_version(0),
-        m_metadata_parser_map(md_constant_parser::create_metadata_parser_map())
+        m_version(0)
     {
         try
         {
@@ -370,7 +371,7 @@ namespace librealsense
             }
             else
             {
-                rs2_frame_metadata_value type;
+                rs2_frame_metadata_value type{};
                 if (!safe_convert(key_val_msg->key, type))
                 {
                     remaining[key_val_msg->key] = key_val_msg->value;
@@ -437,13 +438,13 @@ namespace librealsense
         //attaching a temp stream to the frame. Playback sensor should assign the real stream
         frame->set_stream(std::make_shared<video_stream_profile>(platform::stream_profile{}));
         frame->get_stream()->set_format(stream_format);
-        frame->get_stream()->set_stream_index(stream_id.stream_index);
+        frame->get_stream()->set_stream_index(int(stream_id.stream_index));
         frame->get_stream()->set_stream_type(stream_id.stream_type);
         video_frame->data = std::move(msg->data);
         librealsense::frame_holder fh{ video_frame };
         LOG_DEBUG("Created image frame: " << stream_id << " " << video_frame->get_width() << "x" << video_frame->get_height() << " " << stream_format);
 
-        return std::move(fh);
+        return fh;
     }
 
     frame_holder ros_reader::create_motion_sample(const rosbag::MessageInstance &motion_data) const
@@ -534,6 +535,14 @@ namespace librealsense
 
         pose_frame::pose_info pose{};
         std::chrono::duration<double, std::milli> timestamp_ms;
+        size_t frame_size = sizeof(pose);
+        rs2_extension frame_type = RS2_EXTENSION_POSE_FRAME;
+        frame_additional_data additional_data{};
+
+        additional_data.fisheye_ae_mode = false;
+
+        stream_identifier stream_id;
+
         if (m_version == legacy_file_format::file_version())
         {
             auto pose_msg = instantiate_msg<realsense_legacy_msgs::pose>(msg);
@@ -569,15 +578,9 @@ namespace librealsense
             pose.acceleration = to_float3(accel_msg->linear);
             pose.angular_velocity = to_float3(twist_msg->angular);
             pose.velocity = to_float3(twist_msg->linear);
+
         }
-        size_t frame_size = sizeof(pose);
-        rs2_extension frame_type = RS2_EXTENSION_POSE_FRAME;
-        frame_additional_data additional_data{};
 
-        additional_data.frame_number = 0; //No support for frame numbers
-        additional_data.fisheye_ae_mode = false;
-
-        stream_identifier stream_id;
         if (m_version == legacy_file_format::file_version())
         {
             //Version 1 legacy
@@ -606,6 +609,10 @@ namespace librealsense
                 {
                     pose.tracker_confidence = std::stoul(kvp.second);
                 }
+                else if (kvp.first == FRAME_NUMBER_MD_STR)
+                {
+                    additional_data.frame_number = std::stoul(kvp.second);
+                }
             }
         }
 
@@ -619,15 +626,15 @@ namespace librealsense
         }
         librealsense::pose_frame* pose_frame = static_cast<librealsense::pose_frame*>(new_frame);
         //attaching a temp stream to the frame. Playback sensor should assign the real stream
-        new_frame->set_stream(std::make_shared<stream_profile_base>(platform::stream_profile{}));
+        new_frame->set_stream(std::make_shared<pose_stream_profile>(platform::stream_profile{}));
         new_frame->get_stream()->set_format(RS2_FORMAT_6DOF);
-        new_frame->get_stream()->set_stream_index(stream_id.stream_index);
+        new_frame->get_stream()->set_stream_index(int(stream_id.stream_index));
         new_frame->get_stream()->set_stream_type(stream_id.stream_type);
         byte* data = pose_frame->data.data();
         memcpy(data, &pose, frame_size);
         frame_holder fh{ new_frame };
         LOG_DEBUG("Created new frame " << frame_type);
-        return std::move(fh);
+        return fh;
     }
 
     uint32_t ros_reader::read_file_version(const rosbag::Bag& file)
@@ -816,20 +823,12 @@ namespace librealsense
     {
         using namespace ds;
 
-        std::vector<int> ds5_PIDs =
-        {
-            RS400_PID, RS410_PID, RS415_PID, RS430_PID, RS430_MM_PID,
-            RS_USB2_PID, RS400_IMU_PID, RS420_PID, RS420_MM_PID,
-            RS410_MM_PID, RS400_MM_PID, RS430_MM_RGB_PID, RS460_PID,
-            RS435_RGB_PID, RS405_PID, RS435I_PID
-        };
-
-        auto it = std::find_if(ds5_PIDs.begin(), ds5_PIDs.end(), [&](int ds5_pid)
+        auto it = std::find_if(rs400_sku_pid.begin(), rs400_sku_pid.end(), [&](int ds5_pid)
         {
             return pid == ds5_pid;
         });
 
-        return it != ds5_PIDs.end();
+        return it != rs400_sku_pid.end();
     }
 
     bool ros_reader::is_sr300_PID(int pid)
@@ -894,10 +893,7 @@ namespace librealsense
         {
             if (is_depth_sensor(sensor_name))
             {
-                auto zo_point_x = std::shared_ptr<option>(&options->get_option(RS2_OPTION_ZERO_ORDER_POINT_X), [](option*) {});
-                auto zo_point_y = std::shared_ptr<option>(&options->get_option(RS2_OPTION_ZERO_ORDER_POINT_Y), [](option*) {});
-
-                return std::make_shared<recommended_proccesing_blocks_snapshot>(l500_depth_sensor::get_l500_recommended_proccesing_blocks(zo_point_x, zo_point_y));
+                return std::make_shared<recommended_proccesing_blocks_snapshot>(l500_depth_sensor::get_l500_recommended_proccesing_blocks());
             }
             throw io_exception("Unrecognized sensor name");
         }
@@ -1101,10 +1097,10 @@ namespace librealsense
         }
         return sensor_indices;
     }
-    std::shared_ptr<stream_profile_base> ros_reader::create_pose_profile(uint32_t stream_index, uint32_t fps)
+    std::shared_ptr<pose_stream_profile> ros_reader::create_pose_profile(uint32_t stream_index, uint32_t fps)
     {
         rs2_format format = RS2_FORMAT_6DOF;
-        auto profile = std::make_shared<stream_profile_base>(platform::stream_profile{ 0, 0, fps, static_cast<uint32_t>(format) });
+        auto profile = std::make_shared<pose_stream_profile>(platform::stream_profile{ 0, 0, fps, static_cast<uint32_t>(format) });
         profile->set_stream_index(stream_index);
         profile->set_stream_type(RS2_STREAM_POSE);
         profile->set_format(format);
@@ -1135,7 +1131,19 @@ namespace librealsense
         intrinsics.ppx = ci.K[2];
         intrinsics.fy = ci.K[4];
         intrinsics.ppy = ci.K[5];
-        memcpy(intrinsics.coeffs, ci.D.data(), sizeof(intrinsics.coeffs));
+        intrinsics.model = RS2_DISTORTION_NONE;
+        for (std::underlying_type<rs2_distortion>::type i = 0; i < RS2_DISTORTION_COUNT; ++i)
+        {
+            if (strcmp(ci.distortion_model.c_str(), rs2_distortion_to_string(static_cast<rs2_distortion>(i))) == 0)
+            {
+                intrinsics.model = static_cast<rs2_distortion>(i);
+                break;
+            }
+        }
+        for (size_t i = 0; i < ci.D.size() && i < sizeof(intrinsics.coeffs)/sizeof(intrinsics.coeffs[0]); ++i)
+        {
+            intrinsics.coeffs[i] = ci.D[i];
+        }
         profile->set_intrinsics([intrinsics]() {return intrinsics; });
         profile->set_stream_index(sd.index);
         profile->set_stream_type(sd.type);
@@ -1358,7 +1366,7 @@ namespace librealsense
 
             zo_point_x = std::make_shared<const_value_option>("", zo_opt_x_val);
             zo_point_y = std::make_shared<const_value_option>("", zo_opt_y_val);
-            return std::make_shared<ExtensionToType<RS2_EXTENSION_ZERO_ORDER_FILTER>::type>(zo_point_x, zo_point_y);
+            return std::make_shared<ExtensionToType<RS2_EXTENSION_ZERO_ORDER_FILTER>::type>();
         default:
             return nullptr;
         }

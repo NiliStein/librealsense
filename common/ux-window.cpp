@@ -33,6 +33,7 @@ namespace rs2
         config_file::instance().set_default(configurations::viewer::log_to_console, true);
         config_file::instance().set_default(configurations::viewer::log_to_file, false);
         config_file::instance().set_default(configurations::viewer::log_severity, 2);
+        config_file::instance().set_default(configurations::viewer::metric_system, true);
 
         config_file::instance().set_default(configurations::record::compression_mode, 2); // Let the device decide
         config_file::instance().set_default(configurations::record::default_path, get_folder_path(special_folder::user_documents));
@@ -50,8 +51,7 @@ namespace rs2
         // so for now Macs should not use the GLSL stuff
         config_file::instance().set_default(configurations::performance::glsl_for_processing, false);
         config_file::instance().set_default(configurations::performance::glsl_for_rendering, false);
-#endif
-
+#else
         auto vendor = (const char*)glGetString(GL_VENDOR);
         auto renderer = (const char*)glGetString(GL_RENDERER);
         auto version = (const char*)glGetString(GL_VERSION);
@@ -89,6 +89,7 @@ namespace rs2
             config_file::instance().set_default(configurations::performance::glsl_for_processing, false);
             config_file::instance().set_default(configurations::performance::glsl_for_rendering, false);
         }
+#endif
     }
 
     void ux_window::reload()
@@ -98,8 +99,14 @@ namespace rs2
 
     void ux_window::refresh()
     {
+        if (_use_glsl_proc) rs2::gl::shutdown_processing();
+        rs2::gl::shutdown_rendering();
+
         _use_glsl_render = config_file::instance().get(configurations::performance::glsl_for_rendering);
         _use_glsl_proc = config_file::instance().get(configurations::performance::glsl_for_processing);
+
+        rs2::gl::init_rendering(_use_glsl_render);
+        if (_use_glsl_proc) rs2::gl::init_processing(_win, _use_glsl_proc);
     }
 
     void ux_window::link_hovered()
@@ -141,6 +148,9 @@ namespace rs2
     {
         if (_win)
         {
+            rs2::gl::shutdown_rendering();
+            if (_use_glsl_proc) rs2::gl::shutdown_processing();
+
             ImGui::GetIO().Fonts->ClearFonts();  // To be refactored into Viewer theme object
             ImGui_ImplGlfw_Shutdown();
             glfwDestroyWindow(_win);
@@ -188,8 +198,7 @@ namespace rs2
         _fullscreen = config_file::instance().get(configurations::window::is_fullscreen);
 
         rs2_error* e = nullptr;
-        //_title_str = to_string() << _title << " v" << api_version_to_string(rs2_get_api_version(&e));
-		_title_str = to_string() << _title;
+        _title_str = to_string() << _title << " v" << api_version_to_string(rs2_get_api_version(&e));
         auto debug = is_debug();
         if (debug)
         {
@@ -321,6 +330,9 @@ namespace rs2
             }
         });
 
+        rs2::gl::init_rendering(_use_glsl_render);
+        if (_use_glsl_proc) rs2::gl::init_processing(_win, _use_glsl_proc);
+
         glfwShowWindow(_win);
         glfwFocusWindow(_win);
 
@@ -352,6 +364,86 @@ namespace rs2
         _on_load_message.push_back(msg);
     }
 
+    void ux_window::imgui_config_pop()
+    {
+        ImGui::PopFont();
+        ImGui::End();
+
+        ImGui::PopStyleColor(3);
+        ImGui::PopStyleVar(2);
+        end_frame();
+
+        glPopMatrix();
+    }
+
+    void ux_window::imgui_config_push()
+    {
+        glPushMatrix();
+        glViewport(0, 0, _fb_width, _fb_height);
+        glClearColor(0.036f, 0.044f, 0.051f, 1.f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glLoadIdentity();
+        glOrtho(0, _width, _height, 0, -1, +1);
+
+        // Fade-in the logo
+        auto opacity = smoothstep(float(_splash_timer.elapsed_ms()), 100.f, 2500.f);
+        auto ox = 0.7f - smoothstep(float(_splash_timer.elapsed_ms()), 200.f, 1900.f) * 0.4f;
+        auto oy = 0.5f;
+        auto power = std::sin(smoothstep(float(_splash_timer.elapsed_ms()), 150.f, 2200.f) * 3.14f) * 0.96f;
+
+        if (_use_glsl_render)
+        {
+            auto shader = ((splash_screen_shader*)&_2d_vis->get_shader());
+            shader->begin();
+            shader->set_power(power);
+            shader->set_ray_center(float2{ ox, oy });
+            shader->end();
+            _2d_vis->draw_texture(_splash_tex.get_gl_handle(), opacity);
+        }
+        else
+        {
+            _splash_tex.show({ 0.f,0.f,float(_width),float(_height) }, opacity);
+        }
+
+        std::string hourglass = u8"\uf250";
+        static periodic_timer every_200ms(std::chrono::milliseconds(200));
+        bool do_200ms = every_200ms;
+        if (_query_devices && do_200ms)
+        {
+            _missing_device = rs2::context().query_devices(RS2_PRODUCT_LINE_ANY).size() == 0;
+            _hourglass_index = (_hourglass_index + 1) % 5;
+
+            if (!_missing_device)
+            {
+                _dev_stat_message = u8"\uf287 RealSense device detected.";
+                _query_devices = false;
+            }
+        }
+
+        hourglass[2] += _hourglass_index;
+
+        auto flags = ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoTitleBar;
+
+        auto text_color = light_grey;
+        text_color.w = opacity;
+        ImGui::PushStyleColor(ImGuiCol_Text, text_color);
+        ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, white);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 5, 5 });
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 1);
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, transparent);
+        ImGui::SetNextWindowPos({ (float)_width / 2 - 150, (float)_height / 2 + 70 });
+
+        ImGui::SetNextWindowSize({ (float)_width, (float)_height });
+        ImGui::Begin("Splash Screen Banner", nullptr, flags);
+        ImGui::PushFont(_font_18);
+
+        ImGui::Text("%s   Loading %s...", hourglass.c_str(), _title_str.c_str());
+    }
+
     // Check that the graphic subsystem is valid and start a new frame
     ux_window::operator bool()
     {
@@ -381,9 +473,11 @@ namespace rs2
 
         auto res = !glfwWindowShouldClose(_win);
 
+
         if (_first_frame)
         {
             assert(!_first_load.joinable()); // You must call to reset() before initiate new thread
+
 
             _first_load = std::thread([&]() {
                 while (_keep_alive && !_app_ready)
@@ -413,70 +507,8 @@ namespace rs2
                 _is_ui_aligned = is_gui_aligned(_win);
                 _first_frame = false;
             }
-            glPushMatrix();
-            glViewport(0, 0, _fb_width, _fb_height);
-            glClearColor(0.036f, 0.044f, 0.051f, 1.f);
-            glClear(GL_COLOR_BUFFER_BIT);
 
-            glLoadIdentity();
-            glOrtho(0, _width, _height, 0, -1, +1);
-
-            // Fade-in the logo
-            auto opacity = smoothstep(float(_splash_timer.elapsed_ms()), 100.f, 2500.f);
-            auto ox = 0.7f - smoothstep(float(_splash_timer.elapsed_ms()), 200.f, 1900.f) * 0.4f;
-            auto oy = 0.5f;
-            auto power = std::sin(smoothstep(float(_splash_timer.elapsed_ms()), 150.f, 2200.f) * 3.14f) * 0.96f;
-
-            if (_use_glsl_render)
-            {
-                auto shader = ((splash_screen_shader*)&_2d_vis->get_shader());
-                shader->begin();
-                shader->set_power(power);
-                shader->set_ray_center(float2{ox, oy});
-                shader->end();
-                _2d_vis->draw_texture(_splash_tex.get_gl_handle(), opacity);
-            }
-            else
-            {
-                _splash_tex.show({ 0.f,0.f,float(_width),float(_height) }, opacity);
-            }
-
-            std::string hourglass = u8"\uf250";
-            static periodic_timer every_200ms(std::chrono::milliseconds(200));
-            bool do_200ms = every_200ms;
-            if (_query_devices && do_200ms)
-            {
-                _missing_device = rs2::context().query_devices(RS2_PRODUCT_LINE_ANY).size() == 0;
-                _hourglass_index = (_hourglass_index + 1) % 5;
-
-                if (!_missing_device)
-                {
-                    _dev_stat_message = u8"\uf287 RealSense device detected.";
-                    _query_devices = false;
-                }
-            }
-
-            hourglass[2] += _hourglass_index;
-
-            auto flags = ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoCollapse |
-                ImGuiWindowFlags_NoTitleBar;
-
-            auto text_color = light_grey;
-            text_color.w = opacity;
-            ImGui::PushStyleColor(ImGuiCol_Text, text_color);
-            ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, white);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 5, 5 });
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 1);
-            ImGui::PushStyleColor(ImGuiCol_WindowBg, transparent);
-            ImGui::SetNextWindowPos({ (float)_width / 2 - 150, (float)_height / 2 + 70 });
-            
-            ImGui::SetNextWindowSize({ (float)_width, (float)_height });
-            ImGui::Begin("Splash Screen Banner", nullptr, flags);
-            ImGui::PushFont(_font_18);
-
-            ImGui::Text("%s   Loading %s...", hourglass.c_str(), _title_str.c_str());
+            imgui_config_push();
 
             {
                 std::lock_guard<std::mutex> lock(_on_load_message_mtx);
@@ -498,15 +530,8 @@ namespace rs2
                 }
             }
 
-            ImGui::PopFont();
-            ImGui::End();
-            
-            ImGui::PopStyleColor(3);
-            ImGui::PopStyleVar(2);
+            imgui_config_pop();
 
-            end_frame();
-
-            glPopMatrix();
 
             // Yield the CPU
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -533,6 +558,9 @@ namespace rs2
         }
 
         end_frame();
+
+        rs2::gl::shutdown_rendering();
+        if (_use_glsl_proc) rs2::gl::shutdown_processing();
 
         ImGui::GetIO().Fonts->ClearFonts();  // To be refactored into Viewer theme object
         ImGui_ImplGlfw_Shutdown();
