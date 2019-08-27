@@ -3876,201 +3876,206 @@ namespace rs2
         }
         ImGui::PopStyleColor(2);
         ImGui::SameLine();
+
+#if 0 //Remove Menu and Info Icons
         ////////////////////////////////////////
         // Draw Info icon
         ////////////////////////////////////////
-        //draw_info_icon(window, window.get_font(), device_panel_icons_size);
-        //ImGui::SameLine();
+        draw_info_icon(window, window.get_font(), device_panel_icons_size);
+        ImGui::SameLine();
 
         ////////////////////////////////////////
         // Draw Menu icon
         ////////////////////////////////////////
-        //std::string label = to_string() << "device_menu" << id;
-        //std::string bars_button_name = to_string() << textual_icons::bars << "##" << id;
+        std::string label = to_string() << "device_menu" << id;
+        std::string bars_button_name = to_string() << textual_icons::bars << "##" << id;
 
-        //if (ImGui::Button(bars_button_name.c_str(), device_panel_icons_size))
-        //{
-        //    ImGui::OpenPopup(label.c_str());
-        //}
-        //if (ImGui::IsItemHovered())
-        //{
-        //    ImGui::SetTooltip("%s", "Click for more");
-        //    window.link_hovered();
-        //}
-        //ImGui::PopFont();
-        //ImGui::PushFont(window.get_font());
-        //static bool keep_showing_advanced_mode_modal = false;
-        //if (ImGui::BeginPopup(label.c_str()))
-        //{
-        //    bool something_to_show = false;
-        //    ImGui::PushStyleColor(ImGuiCol_Text, dark_grey);
-        //    if (auto tm2_extensions = dev.as<rs2::tm2>())
-        //    {
-        //        something_to_show = true;
-        //        try
-        //        {
-        //            if (!tm2_extensions.is_loopback_enabled() && ImGui::Selectable("Enable loopback...", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
-        //            {
-        //                if (const char* ret = file_dialog_open(file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL))
-        //                {
-        //                    tm2_extensions.enable_loopback(ret);
-        //                }
-        //            }
-        //            if (tm2_extensions.is_loopback_enabled() && ImGui::Selectable("Disable loopback...", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
-        //            {
-        //                tm2_extensions.disable_loopback();
-        //            }
-        //            if (ImGui::IsItemHovered())
-        //            {
-        //                if (is_streaming)
-        //                    ImGui::SetTooltip("Stop streaming to use loopback functionality");
-        //                else
-        //                    ImGui::SetTooltip("Enter the device to loopback mode (inject frames from file to FW)");
-        //            }
+        if (ImGui::Button(bars_button_name.c_str(), device_panel_icons_size))
+        {
+            ImGui::OpenPopup(label.c_str());
+        }
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("%s", "Click for more");
+            window.link_hovered();
+        }
+        ImGui::PopFont();
+        ImGui::PushFont(window.get_font());
+        static bool keep_showing_advanced_mode_modal = false;
+        if (ImGui::BeginPopup(label.c_str()))
+        {
+            bool something_to_show = false;
+            ImGui::PushStyleColor(ImGuiCol_Text, dark_grey);
+            if (auto tm2_extensions = dev.as<rs2::tm2>())
+            {
+                something_to_show = true;
+                try
+                {
+                    if (!tm2_extensions.is_loopback_enabled() && ImGui::Selectable("Enable loopback...", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
+                    {
+                        if (const char* ret = file_dialog_open(file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL))
+                        {
+                            tm2_extensions.enable_loopback(ret);
+                        }
+                    }
+                    if (tm2_extensions.is_loopback_enabled() && ImGui::Selectable("Disable loopback...", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
+                    {
+                        tm2_extensions.disable_loopback();
+                    }
+                    if (ImGui::IsItemHovered())
+                    {
+                        if (is_streaming)
+                            ImGui::SetTooltip("Stop streaming to use loopback functionality");
+                        else
+                            ImGui::SetTooltip("Enter the device to loopback mode (inject frames from file to FW)");
+                    }
 
-        //            if (auto tm_sensor = dev.first<pose_sensor>())
-        //            {
-        //                if (ImGui::Selectable("Export Localization map", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
-        //                {
-        //                    if (auto target_path = file_dialog_open(save_file, "Tracking device Localization map (RAW)\0*.*\0", NULL, NULL))
-        //                    {
-        //                        error_message = safe_call([&]()
-        //                        {
-        //                            std::stringstream ss;
-        //                            ss << "Exporting localization map to " << target_path << " ... ";
-        //                            viewer.not_model.add_log(ss.str());
-        //                            bin_file_from_bytes(target_path, tm_sensor.export_localization_map());
-        //                            ss.clear();
-        //                            ss << "completed";
-        //                            viewer.not_model.add_log(ss.str());
-        //                        });
-        //                    }
-        //                }
+                    if (auto tm_sensor = dev.first<pose_sensor>())
+                    {
+                        if (ImGui::Selectable("Export Localization map", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
+                        {
+                            if (auto target_path = file_dialog_open(save_file, "Tracking device Localization map (RAW)\0*.*\0", NULL, NULL))
+                            {
+                                error_message = safe_call([&]()
+                                {
+                                    std::stringstream ss;
+                                    ss << "Exporting localization map to " << target_path << " ... ";
+                                    viewer.not_model.add_log(ss.str());
+                                    bin_file_from_bytes(target_path, tm_sensor.export_localization_map());
+                                    ss.clear();
+                                    ss << "completed";
+                                    viewer.not_model.add_log(ss.str());
+                                });
+                            }
+                        }
 
-        //                if (ImGui::IsItemHovered())
-        //                {
-        //                    if (is_streaming)
-        //                        ImGui::SetTooltip("Stop streaming to Export localization map");
-        //                    else
-        //                        ImGui::SetTooltip("Retrieve the localization map from device");
-        //                }
+                        if (ImGui::IsItemHovered())
+                        {
+                            if (is_streaming)
+                                ImGui::SetTooltip("Stop streaming to Export localization map");
+                            else
+                                ImGui::SetTooltip("Retrieve the localization map from device");
+                        }
 
-        //                if (ImGui::Selectable("Import Localization map", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
-        //                {
-        //                    if (auto source_path = file_dialog_open(open_file, "Tracking device Localization map (RAW)\0*.*\0", NULL, NULL))
-        //                    {
-        //                        error_message = safe_call([&]()
-        //                        {
-        //                            std::stringstream ss;
-        //                            ss << "Importing localization map from " << source_path << " ... ";
-        //                            tm_sensor.import_localization_map(bytes_from_bin_file(source_path));
-        //                            ss << "completed";
-        //                            viewer.not_model.add_log(ss.str());
-        //                        });
-        //                    }
-        //                }
+                        if (ImGui::Selectable("Import Localization map", false, is_streaming ? ImGuiSelectableFlags_Disabled : 0))
+                        {
+                            if (auto source_path = file_dialog_open(open_file, "Tracking device Localization map (RAW)\0*.*\0", NULL, NULL))
+                            {
+                                error_message = safe_call([&]()
+                                {
+                                    std::stringstream ss;
+                                    ss << "Importing localization map from " << source_path << " ... ";
+                                    tm_sensor.import_localization_map(bytes_from_bin_file(source_path));
+                                    ss << "completed";
+                                    viewer.not_model.add_log(ss.str());
+                                });
+                            }
+                        }
 
-        //                if (ImGui::IsItemHovered())
-        //                {
-        //                    if (is_streaming)
-        //                        ImGui::SetTooltip("Stop streaming to Import localization map");
-        //                    else
-        //                        ImGui::SetTooltip("Load localization map from host to device");
-        //                }
-        //            }
-        //        }
-        //        catch (const rs2::error& e)
-        //        {
-        //            error_message = error_to_string(e);
-        //        }
-        //        catch (const std::exception& e)
-        //        {
-        //            error_message = e.what();
-        //        }
-        //    }
+                        if (ImGui::IsItemHovered())
+                        {
+                            if (is_streaming)
+                                ImGui::SetTooltip("Stop streaming to Import localization map");
+                            else
+                                ImGui::SetTooltip("Load localization map from host to device");
+                        }
+                    }
+                }
+                catch (const rs2::error& e)
+                {
+                    error_message = error_to_string(e);
+                }
+                catch (const std::exception& e)
+                {
+                    error_message = e.what();
+                }
+            }
 
-        //    if (allow_remove)
-        //    {
-        //        something_to_show = true;
+            if (allow_remove)
+            {
+                something_to_show = true;
 
-        //        if (auto adv = dev.as<advanced_mode>())
-        //        {
-        //            const bool is_advanced_mode_enabled = adv.is_enabled();
-        //            bool selected = is_advanced_mode_enabled;
-        //            if (ImGui::MenuItem("Advanced Mode", nullptr, &selected))
-        //            {
-        //                keep_showing_advanced_mode_modal = true;
-        //            }
+                if (auto adv = dev.as<advanced_mode>())
+                {
+                    const bool is_advanced_mode_enabled = adv.is_enabled();
+                    bool selected = is_advanced_mode_enabled;
+                    if (ImGui::MenuItem("Advanced Mode", nullptr, &selected))
+                    {
+                        keep_showing_advanced_mode_modal = true;
+                    }
 
-        //            ImGui::Separator();
-        //        }
+                    ImGui::Separator();
+                }
 
-        //        if (ImGui::Selectable("Hardware Reset"))
-        //        {
-        //            try
-        //            {
-        //                restarting_device_info = get_device_info(dev, false);
-        //                dev.hardware_reset();
-        //            }
-        //            catch (const error& e)
-        //            {
-        //                error_message = error_to_string(e);
-        //            }
-        //            catch (const std::exception& e)
-        //            {
-        //                error_message = e.what();
-        //            }
-        //        }
+                if (ImGui::Selectable("Hardware Reset"))
+                {
+                    try
+                    {
+                        restarting_device_info = get_device_info(dev, false);
+                        dev.hardware_reset();
+                    }
+                    catch (const error& e)
+                    {
+                        error_message = error_to_string(e);
+                    }
+                    catch (const std::exception& e)
+                    {
+                        error_message = e.what();
+                    }
+                }
 
-        //        if (dev.is<rs2::updatable>() || dev.is<rs2::update_device>())
-        //        {
-        //            if (ImGui::Selectable("Update Firmware..."))
-        //            {
-        //                begin_update({}, viewer, error_message);
-        //            }
-        //            if (ImGui::IsItemHovered())
-        //                ImGui::SetTooltip("Install official signed firmware from file to the device");
+                if (dev.is<rs2::updatable>() || dev.is<rs2::update_device>())
+                {
+                    if (ImGui::Selectable("Update Firmware..."))
+                    {
+                        begin_update({}, viewer, error_message);
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Install official signed firmware from file to the device");
 
-        //            if ((dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE)) ||
-        //                (dev.query_sensors().size() && dev.query_sensors().front().supports(RS2_CAMERA_INFO_PRODUCT_LINE)))
-        //            if (ImGui::Selectable("Install Recommended Firmware "))
-        //            {
-        //                auto sensors = dev.query_sensors();
-        //                auto product_line_str = "";
-        //                if (dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE))
-        //                    product_line_str = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-        //                if (sensors.size() && sensors.front().supports(RS2_CAMERA_INFO_PRODUCT_LINE))
-        //                    product_line_str = sensors.front().get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-        //                int product_line = parse_product_line(product_line_str);
+                    if ((dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE)) ||
+                        (dev.query_sensors().size() && dev.query_sensors().front().supports(RS2_CAMERA_INFO_PRODUCT_LINE)))
+                    if (ImGui::Selectable("Install Recommended Firmware "))
+                    {
+                        auto sensors = dev.query_sensors();
+                        auto product_line_str = "";
+                        if (dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE))
+                            product_line_str = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+                        if (sensors.size() && sensors.front().supports(RS2_CAMERA_INFO_PRODUCT_LINE))
+                            product_line_str = sensors.front().get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+                        int product_line = parse_product_line(product_line_str);
 
-        //                static auto table = create_default_fw_table();
+                        static auto table = create_default_fw_table();
 
-        //                begin_update(table[product_line], viewer, error_message);
-        //            }
-        //            if (ImGui::IsItemHovered())
-        //                ImGui::SetTooltip("Install default recommended firmware for this device");
-        //        }
-        //    }
+                        begin_update(table[product_line], viewer, error_message);
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("Install default recommended firmware for this device");
+                }
+            }
 
-        //    if (!something_to_show)
-        //    {
-        //        ImGui::Text("This device has no additional options");
-        //    }
+            if (!something_to_show)
+            {
+                ImGui::Text("This device has no additional options");
+            }
 
-        //    ImGui::PopStyleColor();
-        //    ImGui::EndPopup();
-        //}
+            ImGui::PopStyleColor();
+            ImGui::EndPopup();
+        }
 
-        //if (keep_showing_advanced_mode_modal)
-        //{
-        //    const bool is_advanced_mode_enabled = dev.as<advanced_mode>().is_enabled();
-        //    std::string msg = to_string() << "\t\tAre you sure you want to " << (is_advanced_mode_enabled ? "turn off Advanced mode" : "turn on Advanced mode") << "\t\t";
-        //    keep_showing_advanced_mode_modal = prompt_toggle_advanced_mode(!is_advanced_mode_enabled, msg, restarting_device_info, viewer, window);
-        //}
+        if (keep_showing_advanced_mode_modal)
+        {
+            const bool is_advanced_mode_enabled = dev.as<advanced_mode>().is_enabled();
+            std::string msg = to_string() << "\t\tAre you sure you want to " << (is_advanced_mode_enabled ? "turn off Advanced mode" : "turn on Advanced mode") << "\t\t";
+            keep_showing_advanced_mode_modal = prompt_toggle_advanced_mode(!is_advanced_mode_enabled, msg, restarting_device_info, viewer, window);
+        }
+#endif
+
         ////////////////////////////////////////
         // Draw icons names
         ////////////////////////////////////////
         //Move to next line, and we want to keep the horizontal alignment
+		ImGui::NewLine();
         ImGui::SetCursorPos({ panel_pos.x, ImGui::GetCursorPosY() });
         //Using transparent-non-actionable buttons to have the same locations
         ImGui::PushStyleColor(ImGuiCol_Button, ImColor(0, 0, 0, 0));

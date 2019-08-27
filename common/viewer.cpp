@@ -2275,10 +2275,13 @@ namespace rs2
             ImGui::PopStyleVar(2);
         }
 
-        //if (open_about_popup) 
-        //{
-        //    ImGui::OpenPopup(about);                    
-        //}
+#if 0
+        if (open_about_popup) 
+        {
+            ImGui::OpenPopup(about);                    
+        }
+#endif
+
 
         {
             float w = 590.f;
@@ -2297,53 +2300,55 @@ namespace rs2
             ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15, 15));
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 1);
+			
+#if 0	//The following is the "About" code:
+            if (ImGui::BeginPopupModal(about, nullptr, flags))
+            {
+                ImGui::Image((void*)(intptr_t)window.get_splash().get_gl_handle(), 
+                             ImVec2(w - 30, 100), {0.20f, 0.38f}, {0.80f, 0.56f});
 
-            //if (ImGui::BeginPopupModal(about, nullptr, flags))
-            //{
-            //    ImGui::Image((void*)(intptr_t)window.get_splash().get_gl_handle(), 
-            //                 ImVec2(w - 30, 100), {0.20f, 0.38f}, {0.80f, 0.56f});
+                auto realsense_pos = ImGui::GetCursorPos();
+                ImGui::Text("Intel RealSense is a suite of depth-sensing and motion-tracking technologies.");
 
-            //    auto realsense_pos = ImGui::GetCursorPos();
-            //    ImGui::Text("Intel RealSense is a suite of depth-sensing and motion-tracking technologies.");
+                ImGui::Text("librealsense is an open-source cross-platform SDK for working with RealSense devices.");
 
-            //    ImGui::Text("librealsense is an open-source cross-platform SDK for working with RealSense devices.");
+                ImGui::Text("Full source code is available at"); ImGui::SameLine();
+                auto github_pos = ImGui::GetCursorPos();
+                ImGui::Text("github.com/IntelRealSense/librealsense.");
+                
+                ImGui::Text("This software is distributed under the"); ImGui::SameLine();
+                auto license_pos = ImGui::GetCursorPos();
+                ImGui::Text("Apache License, Version 2.0.");
 
-            //    ImGui::Text("Full source code is available at"); ImGui::SameLine();
-            //    auto github_pos = ImGui::GetCursorPos();
-            //    ImGui::Text("github.com/IntelRealSense/librealsense.");
-            //    
-            //    ImGui::Text("This software is distributed under the"); ImGui::SameLine();
-            //    auto license_pos = ImGui::GetCursorPos();
-            //    ImGui::Text("Apache License, Version 2.0.");
+                ImGui::Text("RealSense is a registered trademark of Intel Corporation.");
+                
+                ImGui::Text("Copyright 2018 Intel Corporation.");
 
-            //    ImGui::Text("RealSense is a registered trademark of Intel Corporation.");
-            //    
-            //    ImGui::Text("Copyright 2018 Intel Corporation.");
+                ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
+                ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
 
-            //    ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
-            //    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
-            //    ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
-            //    ImGui::PushStyleColor(ImGuiCol_Text, light_blue);
+                ImGui::SetCursorPos({ realsense_pos.x - 4, realsense_pos.y - 3 });
 
-            //    ImGui::SetCursorPos({ realsense_pos.x - 4, realsense_pos.y - 3 });
+                hyperlink(window, "Intel RealSense", "https://realsense.intel.com/");
 
-            //    hyperlink(window, "Intel RealSense", "https://realsense.intel.com/");
+                ImGui::SetCursorPos({ github_pos.x - 4, github_pos.y - 3 });
+                hyperlink(window, "github.com/IntelRealSense/librealsense", "https://github.com/IntelRealSense/librealsense/");
 
-            //    ImGui::SetCursorPos({ github_pos.x - 4, github_pos.y - 3 });
-            //    hyperlink(window, "github.com/IntelRealSense/librealsense", "https://github.com/IntelRealSense/librealsense/");
+                ImGui::SetCursorPos({ license_pos.x - 4, license_pos.y - 3 });
 
-            //    ImGui::SetCursorPos({ license_pos.x - 4, license_pos.y - 3 });
+                hyperlink(window, "Apache License, Version 2.0", "https://raw.githubusercontent.com/IntelRealSense/librealsense/master/LICENSE");
 
-            //    hyperlink(window, "Apache License, Version 2.0", "https://raw.githubusercontent.com/IntelRealSense/librealsense/master/LICENSE");
-
-            //    ImGui::PopStyleColor(4);
+                ImGui::PopStyleColor(4);
 
         
-            //    ImGui::SetCursorScreenPos({ (float)(x0 + w / 2 - 60), (float)(y0 + h - 30) });
-            //    if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+                ImGui::SetCursorScreenPos({ (float)(x0 + w / 2 - 60), (float)(y0 + h - 30) });
+                if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
 
-            //    ImGui::EndPopup();
-            //}
+                ImGui::EndPopup();
+            }
+#endif
 
             ImGui::PopStyleColor(3);
             ImGui::PopStyleVar(2);
