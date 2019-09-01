@@ -1858,38 +1858,40 @@ namespace rs2
         ImGui::SetNextWindowPos({ window.width() - 100, panel_y });
         ImGui::SetNextWindowSize({ 100, 90 });
 
-        //if (ImGui::BeginPopup("More Options"))
-        //{
-            //settings_open = true;
+#if 0 //Settings popup menu:
+        if (ImGui::BeginPopup("More Options"))
+        {
+            settings_open = true;
 
-            //if (ImGui::Selectable("Report Issue"))
-            //{
-            //    open_issue(devices);
-            //}
+            if (ImGui::Selectable("Report Issue"))
+            {
+                open_issue(devices);
+            }
 
-            //if (ImGui::Selectable("Intel Store"))
-            //{
-            //    open_url(store_url);
-            //}
+            if (ImGui::Selectable("Intel Store"))
+            {
+                open_url(store_url);
+            }
 
-            //if (ImGui::Selectable(settings))
-            //{
-                //open_settings_popup = true;
-            //}
+            if (ImGui::Selectable(settings))
+            {
+                open_settings_popup = true;
+            }
             
-            //ImGui::Separator();
+            ImGui::Separator();
 
-            //if (ImGui::Selectable(about))
-            //{
-            //    open_about_popup = true;
-            //}
+            if (ImGui::Selectable(about))
+            {
+                open_about_popup = true;
+            }
 
-        //    ImGui::EndPopup();
-        //}
-        //else
-        //{
-        //    settings_open = false;
-        //}
+            ImGui::EndPopup();
+        }
+        else
+        {
+            settings_open = false;
+        }
+#endif
 
         static config_file temp_cfg;
         static bool reload_required = false;

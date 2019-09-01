@@ -4091,14 +4091,17 @@ namespace rs2
         
         ImGui::SameLine();  ImGui::ButtonEx("Sync", device_panel_icons_size, ImGuiButtonFlags_Disabled);
 
+		//TODO: Check with Alon why cannot comment this code
         auto info_button_color = show_device_info ? light_blue : light_grey;
         ImGui::PushStyleColor(ImGuiCol_Text, info_button_color);
         ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, info_button_color);
-        ImGui::SameLine(); ImGui::ButtonEx("Info", device_panel_icons_size);
+        ImGui::SameLine();
+		//ImGui::ButtonEx("Info", device_panel_icons_size);
         if (ImGui::IsItemHovered()) window.link_hovered();
         ImGui::PopStyleColor(2);
 
-        ImGui::SameLine(); ImGui::ButtonEx("More", device_panel_icons_size);
+        ImGui::SameLine();
+		//ImGui::ButtonEx("More", device_panel_icons_size);
         if (ImGui::IsItemHovered()) window.link_hovered();
         ImGui::PopStyleColor(3);
 
@@ -4407,7 +4410,7 @@ namespace rs2
         ////////////////////////////////////////
         // Draw Combo Box
         ////////////////////////////////////////
-        for (auto&& sub : subdevices)
+        for (auto&& sub : subdevices) //TODO: Check with Alon
         {
             if (auto dpt = sub->s->as<depth_sensor>())
             {
@@ -4417,11 +4420,11 @@ namespace rs2
                 {
                     bool is_clicked = false;
                     assert(opt_model.opt == RS2_OPTION_VISUAL_PRESET);
-                    ImGui::Text("Preset: ");
-                    if (ImGui::IsItemHovered())
-                    {
-                        ImGui::SetTooltip("Select a preset configuration (or use the load button)");
-                    }
+                    //ImGui::Text("Preset: ");
+                    //if (ImGui::IsItemHovered())
+                    //{
+                    //    ImGui::SetTooltip("Select a preset configuration (or use the load button)");
+                    //}
 
                     ImGui::SameLine();
                     ImGui::PushItemWidth(185);
