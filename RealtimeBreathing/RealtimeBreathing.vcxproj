@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{DE34EE7C-688C-44B8-9B59-D5D4A97B6EBB}</ProjectGuid>
+    <RootNamespace>RealtimeBreathing</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>D:\git\librealsense\build\Debug\</OutDir>
+    <TargetName>RealtimeBreathing</TargetName>
+    <IntDir>Realtimebreathing.dir\Debug\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <ConformanceMode>false</ConformanceMode>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_UNICODE;NOMINMAX;ELPP_THREAD_SAFE;ELPP_NO_DEFAULT_LOG_FILE;BUILD_EASYLOGGINGPP;HWM_OVER_XU;RS2_USE_WMF_BACKEND;UNICODE;__SSSE3__;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Debug";INTERNAL_FW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <SDLCheck>
+      </SDLCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DisableSpecificWarnings>4819</DisableSpecificWarnings>
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <UseFullPaths>false</UseFullPaths>
+      <CompileAs>CompileAsCpp</CompileAs>
+    </ClCompile>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <Link>
+      <AdditionalDependencies>..\build\third-party\glfw\src\Debug\glfw3d.lib;opengl32.lib;glu32.lib;..\build\src\gl\Debug\realsense2-gld.lib;..\build\common\fw\Debug\uvc_fwd.lib;..\build\Debug\realsense2d.lib;..\build\common\fw\uvc_fw.res;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
+      <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
+    </Link>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\common\fw-update-helper.cpp" />
+    <ClCompile Include="..\common\model-views.cpp" />
+    <ClCompile Include="..\common\notifications.cpp" />
+    <ClCompile Include="..\common\opengl3.cpp" />
+    <ClCompile Include="..\common\os.cpp" />
+    <ClCompile Include="..\common\rs-config.cpp" />
+    <ClCompile Include="..\common\ux-alignment.cpp" />
+    <ClCompile Include="..\common\ux-window.cpp" />
+    <ClCompile Include="..\common\viewer.cpp" />
+    <ClCompile Include="..\common\windows-app-bootstrap.cpp" />
+    <ClCompile Include="..\third-party\glad\glad.c" />
+    <ClCompile Include="..\third-party\imgui\imgui.cpp" />
+    <ClCompile Include="..\third-party\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\third-party\imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\third-party\tinyfiledialogs\tinyfiledialogs.c" />
+    <ClCompile Include="rb-gui.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\librealsense\build\common\fw\D4XX_FW_Image.h" />
+    <ClInclude Include="..\..\librealsense\build\common\fw\SR3XX_FW_Image.h" />
+    <ClInclude Include="..\..\librealsense\build\udev-rules.h" />
+    <ClInclude Include="..\..\librealsense\common\fw-update-helper.h" />
+    <ClInclude Include="..\..\librealsense\common\model-views.h" />
+    <ClInclude Include="..\..\librealsense\common\notifications.h" />
+    <ClInclude Include="..\..\librealsense\common\os.h" />
+    <ClInclude Include="..\..\librealsense\common\rendering.h" />
+    <ClInclude Include="..\..\librealsense\common\res\int-rs-splash.hpp" />
+    <ClInclude Include="..\..\librealsense\common\rs-config.h" />
+    <ClInclude Include="..\..\librealsense\common\ux-window.h" />
+    <ClInclude Include="..\..\librealsense\common\viewer.h" />
+    <ClInclude Include="..\..\librealsense\examples\example.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2-gl\rs_processing_gl.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2-gl\rs_processing_gl.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_context.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_device.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_export.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_frame.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_internal.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_options.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_pipeline.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_processing.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_record_playback.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_sensor.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\hpp\rs_types.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_advanced_mode_command.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_config.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_context.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_device.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_frame.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_internal.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_option.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_pipeline.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_processing.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_record_playback.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_sensor.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\h\rs_types.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\rs.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\rs.hpp" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\rsutil.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\rs_advanced_mode.h" />
+    <ClInclude Include="..\..\librealsense\include\librealsense2\rs_advanced_mode.hpp" />
+    <ClInclude Include="..\..\librealsense\src\api.h" />
+    <ClInclude Include="..\..\librealsense\src\core\extension.h" />
+    <ClInclude Include="..\..\librealsense\src\ds5\ds5-device.h" />
+    <ClInclude Include="..\..\librealsense\src\ds5\ds5-options.h" />
+    <ClInclude Include="..\..\librealsense\src\fw-update\fw-update-device-interface.h" />
+    <ClInclude Include="..\..\librealsense\src\fw-update\fw-update-device.h" />
+    <ClInclude Include="..\..\librealsense\src\ivcam\sr300.h" />
+    <ClInclude Include="..\..\librealsense\src\l500\l500-depth.h" />
+    <ClInclude Include="..\..\librealsense\src\l500\l500-device.h" />
+    <ClInclude Include="..\..\librealsense\src\media\playback\playback_device.h" />
+    <ClInclude Include="..\..\librealsense\src\media\playback\playback_sensor.h" />
+    <ClInclude Include="..\..\librealsense\src\media\record\record_device.h" />
+    <ClInclude Include="..\..\librealsense\src\media\record\record_sensor.h" />
+    <ClInclude Include="..\..\librealsense\src\media\ros\ros_file_format.h" />
+    <ClInclude Include="..\..\librealsense\src\software-device.h" />
+    <ClInclude Include="..\..\librealsense\src\stream.h" />
+    <ClInclude Include="..\..\librealsense\src\tm2\tm-device.h" />
+    <ClInclude Include="..\..\librealsense\src\usb\usb-device.h" />
+    <ClInclude Include="..\..\librealsense\third-party\arcball_camera.h" />
+    <ClInclude Include="..\..\librealsense\third-party\glad\glad\glad.h" />
+    <ClInclude Include="..\..\librealsense\third-party\glfw\include\GLFW\glfw3.h" />
+    <ClInclude Include="..\..\librealsense\third-party\imgui\imconfig.h" />
+    <ClInclude Include="..\..\librealsense\third-party\imgui\imgui.h" />
+    <ClInclude Include="..\..\librealsense\third-party\imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="..\..\librealsense\third-party\imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\librealsense\third-party\libtm\libtm\include\TrackingManager.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\boost\boost\enable_if.hpp" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\boost\boost\iterator\iterator_facade.hpp" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\boost\boost\type_traits\remove_reference.hpp" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\cpp_common\include\ros\header.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\msgs\sensor_msgs\Image.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\msgs\sensor_msgs\image_encodings.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\msgs\sensor_msgs\Imu.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\bag.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\message_instance.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\query.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\view.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\roscpp_serialization\include\ros\serialization.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\roscpp_traits\include\ros\message_event.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\roscpp_traits\include\ros\message_traits.h" />
+    <ClInclude Include="..\..\librealsense\third-party\realsense-file\rosbag\rostime\include\ros\time.h" />
+    <ClInclude Include="..\..\librealsense\third-party\tinyfiledialogs\tinyfiledialogs.h" />
+    <ClInclude Include="..\common\realsense-ui-advanced-mode.h" />
+    <ClInclude Include="..\common\ux-alignment.h" />
+    <ClInclude Include="..\third-party\stb_image.h" />
+    <ClInclude Include="example.hpp" />
+    <ClInclude Include="realsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\macros.h" />
+    <ClInclude Include="realsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\structures.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\librealsense\build\realsense2.vcxproj">
+      <Project>{9f058c9f-f8f5-3502-8a53-38d6b40b9ca8}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\librealsense\build\third-party\glfw\src\glfw.vcxproj">
+      <Project>{65a0bf08-cc6b-3c1a-b94b-34de47f657f1}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\..\librealsense\build\ZERO_CHECK.vcxproj">
+      <Project>{147bd0d5-b8a6-34f7-b8ce-600c344cf755}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\build\common\fw\uvc_fw.vcxproj">
+      <Project>{e6e8f035-9954-39e6-a077-e46f3862b14d}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\build\src\gl\realsense2-gl.vcxproj">
+      <Project>{5473e10d-0062-34d4-b3c6-cb0d4f78ae90}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
