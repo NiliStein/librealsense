@@ -198,8 +198,9 @@ namespace rs2
         _fullscreen = config_file::instance().get(configurations::window::is_fullscreen);
 
         rs2_error* e = nullptr;
-        _title_str = to_string() << _title << " v" << api_version_to_string(rs2_get_api_version(&e));
-        auto debug = is_debug();
+        //_title_str = to_string() << _title << " v" << api_version_to_string(rs2_get_api_version(&e));
+		_title_str = to_string() << _title;
+		auto debug = is_debug();
         if (debug)
         {
             _title_str = _title_str + ", DEBUG";
@@ -530,7 +531,7 @@ namespace rs2
                 }
             }
 
-            imgui_config_pop();
+            //imgui_config_pop();
 
 
             // Yield the CPU
