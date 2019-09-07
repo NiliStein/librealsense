@@ -4708,7 +4708,7 @@ namespace rs2
         const ImVec2 name_pos = { pos.x + 9, pos.y + 17 };
         ImGui::SetCursorPos(name_pos);
         std::stringstream ss;
-        ss << dev.get_info(RS2_CAMERA_INFO_NAME);
+        ss << dev.get_info(RS2_CAMERA_INFO_NAME); //for us: Intel RealSense D435
         ImGui::Text(" %s", ss.str().c_str());
         if (dev.supports(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR))
         {
@@ -4716,7 +4716,7 @@ namespace rs2
             ss.str("");
             ss << "   " << textual_icons::usb_type << " " << desc;
             ImGui::SameLine();
-            if (!starts_with(desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow);
+            if (!starts_with(desc, "3.")) ImGui::PushStyleColor(ImGuiCol_Text, yellow); //the usb sign
             else ImGui::PushStyleColor(ImGuiCol_Text, light_grey);
             ImGui::Text(" %s", ss.str().c_str());
             ImGui::PopStyleColor();
@@ -4733,6 +4733,7 @@ namespace rs2
         
         //ImGui::Text(" %s", dev.get_info(RS2_CAMERA_INFO_NAME));
         ImGui::PopFont();
+
 
         ////////////////////////////////////////
         // Draw X Button
@@ -4820,7 +4821,7 @@ namespace rs2
         if (auto p = dev.as<playback>())
         {
             pos = ImGui::GetCursorPos();
-            float space_before_playback_control = 18.0f;
+            float space_before_playback_control = 18.0f; //y
             auto playback_panel_pos = ImVec2{ pos.x + 10, pos.y + space_before_playback_control };
             ImGui::SetCursorPos(playback_panel_pos);
             auto playback_panel_height = draw_playback_panel(window, window.get_font(), viewer);
@@ -5320,6 +5321,29 @@ namespace rs2
 
         ImGui::PopStyleColor(2);
         ImGui::PopFont();
+
+		////////////////////////////////////////
+		// draw Image Processing section
+		////////////////////////////////////////
+		auto ImProc_pos = ImGui::GetCursorPos();
+		ImGui::SetCursorPos({ ImProc_pos.x+6,ImProc_pos.y });
+		std::string label = to_string() << "  " << "Image Processing";
+		ImGui::PushFont(window.get_font());
+		ImGui::PushStyleColor(ImGuiCol_Button, sensor_bg);
+		//ImGui::PushStyleColor(ImGuiCol_ButtonHovered, sensor_bg);
+		//ImGui::PushStyleColor(ImGuiCol_ButtonActive, sensor_bg);
+		if (ImGui::TreeNode(label.c_str())) {
+			auto ImProc_pos1 = ImGui::GetCursorPos();
+			ImGui::SetCursorPos({ ImProc_pos1.x+10, ImProc_pos1.y+3 });
+			std::string label1 = to_string() << "Find Circles";
+			ImGui::Button(label1.c_str());
+			ImGui::TreePop();
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopFont();
+		
+
+		
 
         auto end_screen_pos = ImGui::GetCursorScreenPos();
 
