@@ -8,8 +8,8 @@
 
 int main(int argc, char * argv[]) try
 {
-	// Create and initialize GUI related objects
 	window app(1280, 720, "RealtimeBreathing");
+
 	ImGui_ImplGlfw_Init(app, false);      // imgui library intializition
 	rs2::colorizer colorizer;		// helper to colorize depth images
 	texture depth_image, color_image;     // helpers for rendering images
@@ -25,31 +25,29 @@ int main(int argc, char * argv[]) try
 	rs2::align align_to_depth(RS2_STREAM_DEPTH);
 	rs2::align align_to_color(RS2_STREAM_COLOR);
 
-	bool camera_on = false;
+	bool show_camera_stream = false;
+	bool stream_enabled = false;
 
 	while (app) // application still alive?
 	{
+
 		// render the ui:
 		ImGui_ImplGlfw_NewFrame(1);
+		ImGui::NewFrame();
 
-		//stat camera botton:
-		if (ImGui::Button("start_camera") || camera_on) {
+		ImGui::Begin("Menu"); // Create a window called "Menu" and append into it
+		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
+		ImGui::End();
 
-			if (!camera_on) {
-				cfg.enable_stream(RS2_STREAM_DEPTH);
-				cfg.enable_stream(RS2_STREAM_COLOR);
-				pipe.start(cfg);
-				camera_on = true;
-			}
-			
-			//stop camera toggle button:
-			if (ImGui::Button("stop_camera")) {
-				camera_on = false;
-				cfg.disable_stream(RS2_STREAM_DEPTH);
-				cfg.disable_stream(RS2_STREAM_COLOR);
-				pipe.stop();
-				continue;
-			}
+		//start camera:
+		if (show_camera_stream) {
+
+			ImGui::Begin("Srteam");
+
+			cfg.enable_stream(RS2_STREAM_DEPTH);
+			cfg.enable_stream(RS2_STREAM_COLOR);
+			pipe.start(cfg);
+			stream_enabled = true;
 
 			// using the align object, we block the application until a frameset is available
 			rs2::frameset frameset_depth = pipe.wait_for_frames();
@@ -114,7 +112,17 @@ int main(int argc, char * argv[]) try
 				ImGui::TextWrapped("distance from camera is: %f", dist_to_center);
 			}
 			ImGui::Render();
+			ImGui::End();
+
+		} else { //stop camera:
+			if (stream_enabled) {
+				cfg.disable_stream(RS2_STREAM_DEPTH);
+				cfg.disable_stream(RS2_STREAM_COLOR);
+				pipe.stop();
+			}
+			continue;
 		}
+		
 
 		ImGui::Render();
 	}
