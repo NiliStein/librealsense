@@ -89,3 +89,10 @@ librealsense-log.txt
 *.cxx
 
 .vscode/*
+
+
+RealtimeBreathing/RealtimeBreathing.vcxproj
+RealtimeBreathing/RealtimeBreathing.vcxproj.filters
+RealtimeBreathing/Realtimebreathing.dir/
+RealtimeBreathing/.vs
+RealtimeBreathing/x64
