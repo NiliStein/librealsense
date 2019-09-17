@@ -144,21 +144,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\common\fw-update-helper.cpp" />
-    <ClCompile Include="..\common\model-views.cpp" />
-    <ClCompile Include="..\common\notifications.cpp" />
     <ClCompile Include="..\common\opengl3.cpp" />
-    <ClCompile Include="..\common\os.cpp" />
-    <ClCompile Include="..\common\rs-config.cpp" />
-    <ClCompile Include="..\common\ux-alignment.cpp" />
-    <ClCompile Include="..\common\ux-window.cpp" />
-    <ClCompile Include="..\common\viewer.cpp" />
-    <ClCompile Include="..\common\windows-app-bootstrap.cpp" />
     <ClCompile Include="..\third-party\glad\glad.c" />
     <ClCompile Include="..\third-party\imgui\imgui.cpp" />
     <ClCompile Include="..\third-party\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\third-party\imgui\imgui_impl_glfw.cpp" />
-    <ClCompile Include="..\third-party\tinyfiledialogs\tinyfiledialogs.c" />
     <ClCompile Include="rb-gui.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -93,6 +93,7 @@ librealsense-log.txt
 
 RealtimeBreathing/RealtimeBreathing.vcxproj
 RealtimeBreathing/RealtimeBreathing.vcxproj.filters
+RealtimeBreathing/RealtimeBreathing.vcxproj.user
 RealtimeBreathing/Realtimebreathing.dir/
 RealtimeBreathing/.vs
 RealtimeBreathing/x64

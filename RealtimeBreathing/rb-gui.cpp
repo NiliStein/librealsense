@@ -5,10 +5,14 @@
 #include "example.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
+#include <iostream>
+//#include <GLFW/glfw3.h>
 
 int main(int argc, char * argv[]) try
 {
 	window app(1280, 720, "RealtimeBreathing");
+
+	//ImGui::CreateContext();
 
 	ImGui_ImplGlfw_Init(app, false);      // imgui library intializition
 	rs2::colorizer colorizer;		// helper to colorize depth images
@@ -27,27 +31,28 @@ int main(int argc, char * argv[]) try
 
 	bool show_camera_stream = false;
 	bool stream_enabled = false;
+	bool start_camera = false;
 
 	while (app) // application still alive?
 	{
 
 		// render the ui:
 		ImGui_ImplGlfw_NewFrame(1);
-		ImGui::NewFrame();
+		//ImGui::NewFrame();
 
 		ImGui::Begin("Menu"); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::End();
-
-		//start camera:
 		if (show_camera_stream) {
 
-			ImGui::Begin("Srteam");
+			ImGui::Begin("Stream");
 
-			cfg.enable_stream(RS2_STREAM_DEPTH);
-			cfg.enable_stream(RS2_STREAM_COLOR);
-			pipe.start(cfg);
-			stream_enabled = true;
+			if (!stream_enabled) {
+				cfg.enable_stream(RS2_STREAM_DEPTH);
+				cfg.enable_stream(RS2_STREAM_COLOR);
+				pipe.start(cfg);
+				stream_enabled = true;
+			}
 
 			// using the align object, we block the application until a frameset is available
 			rs2::frameset frameset_depth = pipe.wait_for_frames();
@@ -91,7 +96,7 @@ int main(int argc, char * argv[]) try
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);
-
+			 
 			//todo: fix distance presentation
 			//show the distance of the image from the camera:
 			// try to get a frame of a depth image
@@ -111,7 +116,6 @@ int main(int argc, char * argv[]) try
 				//the following function uses printf() format string:
 				ImGui::TextWrapped("distance from camera is: %f", dist_to_center);
 			}
-			ImGui::Render();
 			ImGui::End();
 
 		} else { //stop camera:
@@ -119,7 +123,9 @@ int main(int argc, char * argv[]) try
 				cfg.disable_stream(RS2_STREAM_DEPTH);
 				cfg.disable_stream(RS2_STREAM_COLOR);
 				pipe.stop();
+				stream_enabled = false;
 			}
+			ImGui::Render();
 			continue;
 		}
 		
