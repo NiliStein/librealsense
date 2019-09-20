@@ -6,7 +6,6 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include <iostream>
-//#include <GLFW/glfw3.h>
 
 int main(int argc, char * argv[]) try
 {
@@ -49,7 +48,7 @@ int main(int argc, char * argv[]) try
 
 			if (!stream_enabled) {
 				cfg.enable_stream(RS2_STREAM_DEPTH);
-				cfg.enable_stream(RS2_STREAM_COLOR);
+				cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
 				pipe.start(cfg);
 				stream_enabled = true;
 			}
@@ -74,10 +73,21 @@ int main(int argc, char * argv[]) try
 			std::map<int, rs2::frame> render_frames;
 			std::vector<rs2::frame> new_frames;
 			rs2::frameset fs;
+			
+			// TODO: Return it back
 			if (pipe.poll_for_frames(&fs))
 			{
 				for (const rs2::frame& f : fs)
 					new_frames.emplace_back(f);
+			}
+
+			for (const rs2::frame& f : frameset_color) {
+				
+				// TODO: Currently, the format of the frame data is RS2_FORMAT_RGB8
+				// TODO: Opencv works with RS2_FORMAT_BGR8. We need to find a way how to convert it to this format.
+				const void * color_frame_data = f.get_data();
+
+				//new_frames.emplace_back(f);
 			}
 
 			// convert the newly-arrived frames to render-firendly format
@@ -89,6 +99,8 @@ int main(int argc, char * argv[]) try
 			// present all the collected frames with opengl mosaic
 			app.show(render_frames);
 
+			
+
 			//the following commented code was the previous implementation to the division to two images of depth and color:
 			////two split frames in app, left for color and right for depth:
 			//depth_image.render(colorized_depth, { 640, 360, app.width() / 2, app.height() / 2 });
@@ -96,7 +108,7 @@ int main(int argc, char * argv[]) try
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);
-			 
+#if 0			 
 			//todo: fix distance presentation
 			//show the distance of the image from the camera:
 			// try to get a frame of a depth image
@@ -116,6 +128,7 @@ int main(int argc, char * argv[]) try
 				//the following function uses printf() format string:
 				ImGui::TextWrapped("distance from camera is: %f", dist_to_center);
 			}
+#endif
 			ImGui::End();
 
 		} else { //stop camera:
