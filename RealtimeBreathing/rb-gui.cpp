@@ -69,13 +69,8 @@ int main(int argc, char * argv[]) try
 			auto color = frameset_color.get_color_frame();
 			auto colorized_depth = colorizer.colorize(depth);
 
-			bool is_saved = false;
-			if (!is_saved) {
-				save_last_frame("D:\\git\\librealsense\\RealtimeBreathing\\frames\\frame", color);
-				is_saved = true;
-			}
-
-
+			save_last_frame("D:\\git\\librealsense\\RealtimeBreathing\\frames\\frame", color);
+			
 			//collect all frames:
 			//using a map as in rs-multicam to allow future changes in number of cameras displayed.
 			std::map<int, rs2::frame> render_frames;
