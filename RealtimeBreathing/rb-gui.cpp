@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include <iostream>
+#include "rb_aux.h"
 
 int main(int argc, char * argv[]) try
 {
@@ -68,6 +69,13 @@ int main(int argc, char * argv[]) try
 			auto color = frameset_color.get_color_frame();
 			auto colorized_depth = colorizer.colorize(depth);
 
+			bool is_saved = false;
+			if (!is_saved) {
+				save_last_frame("D:\\git\\librealsense\\RealtimeBreathing\\frames\\frame", color);
+				is_saved = true;
+			}
+
+
 			//collect all frames:
 			//using a map as in rs-multicam to allow future changes in number of cameras displayed.
 			std::map<int, rs2::frame> render_frames;
@@ -82,6 +90,7 @@ int main(int argc, char * argv[]) try
 			}
 
 			for (const rs2::frame& f : frameset_color) {
+				
 				
 				// TODO: Currently, the format of the frame data is RS2_FORMAT_RGB8
 				// TODO: Opencv works with RS2_FORMAT_BGR8. We need to find a way how to convert it to this format.
