@@ -7,6 +7,7 @@
 
 void save_last_frame(const char* filename, const rs2::video_frame& frame) {
 	static int frame_index = 0;
+	static int frame_counter = 0;
 	static std::string frame_filenames[NUM_OF_LAST_FRAMES] = {""};
 
 	std::string stream_desc{};
@@ -18,13 +19,13 @@ void save_last_frame(const char* filename, const rs2::video_frame& frame) {
 	std::ostringstream oss;
 	oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
 
-	auto filename_png = filename_base + "_" + stream_desc + oss.str() + ".png";
+	auto filename_png = filename_base + "_" + stream_desc + oss.str() + std::to_string(frame_counter) + ".png";
 
 	// delete oldest frame file 
 	if (frame_filenames[frame_index] != "") {
 		const int result = remove(frame_filenames[frame_index].c_str());
 		if (result != 0) {
-			printf("%s\n", strerror(errno)); // No such file or directory
+			printf("remove(%s) failed. Error: %s\n", frame_filenames[frame_index].c_str(), strerror(errno)); // No such file or directory
 			// TODO: throw exception
 		}
 	}
@@ -34,4 +35,5 @@ void save_last_frame(const char* filename, const rs2::video_frame& frame) {
 
 	frame_filenames[frame_index] = filename_png;
 	frame_index = (frame_index + 1) % NUM_OF_LAST_FRAMES;
+	frame_counter++;
 }
