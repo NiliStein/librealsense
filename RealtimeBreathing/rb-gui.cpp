@@ -69,7 +69,7 @@ int main(int argc, char * argv[]) try
 			auto color = frameset_color.get_color_frame();
 			auto colorized_depth = colorizer.colorize(depth);
 
-			save_last_frame("D:\\git\\librealsense\\RealtimeBreathing\\frames\\frame", color);
+			save_last_frame("frames\\frame", color);
 			
 			//collect all frames:
 			//using a map as in rs-multicam to allow future changes in number of cameras displayed.
