@@ -92,7 +92,7 @@
       <Optimization>Disabled</Optimization>
       <ConformanceMode>false</ConformanceMode>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_UNICODE;NOMINMAX;ELPP_THREAD_SAFE;ELPP_NO_DEFAULT_LOG_FILE;BUILD_EASYLOGGINGPP;HWM_OVER_XU;RS2_USE_WMF_BACKEND;UNICODE;__SSSE3__;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Debug";INTERNAL_FW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;$(OPEN_CV)\build\install\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <SDLCheck>
       </SDLCheck>
@@ -108,7 +108,7 @@
       </Command>
     </PostBuildEvent>
     <Link>
-      <AdditionalDependencies>..\build\third-party\glfw\src\Debug\glfw3d.lib;opengl32.lib;glu32.lib;..\build\src\gl\Debug\realsense2-gld.lib;..\build\common\fw\Debug\uvc_fwd.lib;..\build\Debug\realsense2d.lib;..\build\common\fw\uvc_fw.res;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\build\third-party\glfw\src\Debug\glfw3d.lib;opengl32.lib;glu32.lib;..\build\src\gl\Debug\realsense2-gld.lib;..\build\common\fw\Debug\uvc_fwd.lib;..\build\Debug\realsense2d.lib;..\build\common\fw\uvc_fw.res;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib;$(OPEN_CV)\build\install\x64\vc15\lib\opencv_world420d.lib</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
@@ -137,7 +137,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_UNICODE;NOMINMAX;ELPP_THREAD_SAFE;ELPP_NO_DEFAULT_LOG_FILE;BUILD_EASYLOGGINGPP;HWM_OVER_XU;RS2_USE_WMF_BACKEND;UNICODE;__SSSE3__;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Debug";INTERNAL_FW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;$(OPEN_CV)\build\install\include\;(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
@@ -145,7 +145,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>..\build\third-party\glfw\src\Release\glfw3.lib;opengl32.lib;glu32.lib;..\build\src\gl\Release\realsense2-gl.lib;..\build\common\fw\Release\uvc_fw.lib;..\build\Release\realsense2.lib;..\build\common\fw\uvc_fw.res;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\build\third-party\glfw\src\Release\glfw3.lib;opengl32.lib;glu32.lib;..\build\src\gl\Release\realsense2-gl.lib;..\build\common\fw\Release\uvc_fw.lib;..\build\Release\realsense2.lib;..\build\common\fw\uvc_fw.res;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib; $(OPEN_CV)\build\install\x64\vc15\lib\opencv_world420.lib;</AdditionalDependencies>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
