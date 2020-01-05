@@ -6,15 +6,15 @@ Dependencies:
 		- Run cmake and:
 			1. set the source_code to be the path of opencv, let's call it OPENCV_PATH
 			2. set build directory to OPENCV_PATH/build
-			3. click on configure and then click yes
+			3. click on configure and then click yes. At the prompt make sure you choose visual studio 17 and x64 platform.
 			4. Disable the following:
-				a. BUILD_IP_IW
-				b. BUILD_JAVA
+				a. BUILD_JAVA
+				b. BUILD_OPENCV_java_bindings_generator
 				c. BUILD_OPENCV_python_bindings_generator
 				d. BUILD_opencv_python_tests
-				e. BUILD_opencv_stitching
 			5. Enable the following:
 				a. BUILD_opencv_world
+			6. click generate
 		6. Go to OPENCV_PATH/build and run powershell:
 			a. cmake --build . --config Release --target INSTALL
 			b. cmake --build . --config Debug --target INSTALL
