@@ -63,8 +63,9 @@ int main(int argc, char * argv[]) try
 			}
 
 			// using the align object, we block the application until a frameset is available
-			rs2::frameset frameset_depth = pipe.wait_for_frames();
-			rs2::frameset frameset_color = pipe.wait_for_frames();
+			rs2::frameset fs = pipe.wait_for_frames();
+			rs2::frameset frameset_depth(fs);
+			rs2::frameset frameset_color(fs);
 
 			// align all frames to depth viewport
 			frameset_depth = align_to_depth.process(frameset_depth);
@@ -76,35 +77,24 @@ int main(int argc, char * argv[]) try
 			auto depth = frameset_depth.get_depth_frame();
 			auto color = frameset_color.get_color_frame();
 			auto colorized_depth = colorizer.colorize(depth);
-
-			save_last_frame("frames\\frame", color);
 			
 			//collect all frames:
 			//using a map as in rs-multicam to allow future changes in number of cameras displayed.
 			std::map<int, rs2::frame> render_frames;
-			std::vector<rs2::frame> new_frames;
-			rs2::frameset fs;
-			
-			// TODO: Return it back
-			if (pipe.poll_for_frames(&fs))
-			{
-				for (const rs2::frame& f : fs)
-					new_frames.emplace_back(f);
-			}
 
 			for (const rs2::frame& f : frameset_color) {
 				
-				
+				save_last_frame("frames\\frame", f);
 				// TODO: Currently, the format of the frame data is only RS2_FORMAT_RGB8, RS2_FORMAT_BGR8 causes exception....
 				const void * color_frame_data = f.get_data();
 				cv::Mat rgb8_mat(cv::Size(color_frame_width, color_frame_height), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
 				cv::Mat bgr8_mat;
-				cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
+				//cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
 				//new_frames.emplace_back(f);
 			}
 
 			// convert the newly-arrived frames to render-firendly format
-			for (const auto& frame : new_frames)
+			for (const auto& frame : fs)
 			{
 				render_frames[frame.get_profile().unique_id()] = colorizer.process(frame);
 			}
