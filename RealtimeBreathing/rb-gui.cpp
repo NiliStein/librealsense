@@ -33,9 +33,6 @@ int main(int argc, char * argv[]) try
 	bool stream_enabled = false;
 	bool start_camera = false;
 
-	int color_frame_width = 0;
-	int color_frame_height = 0;
-
 	while (app) // application still alive?
 	{
 
@@ -55,10 +52,6 @@ int main(int argc, char * argv[]) try
 				cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
 				pipe.start(cfg);
 
-				//Fetch Width and height
-				rs2::video_stream_profile color_stream = pipe.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
-				color_frame_height = color_stream.height();
-				color_frame_width = color_stream.width();
 				stream_enabled = true;
 			}
 
@@ -82,16 +75,24 @@ int main(int argc, char * argv[]) try
 			//using a map as in rs-multicam to allow future changes in number of cameras displayed.
 			std::map<int, rs2::frame> render_frames;
 
-			for (const rs2::frame& f : frameset_color) {
-				
-				save_last_frame("frames\\frame", f);
-				// TODO: Currently, the format of the frame data is only RS2_FORMAT_RGB8, RS2_FORMAT_BGR8 causes exception....
-				const void * color_frame_data = f.get_data();
-				cv::Mat rgb8_mat(cv::Size(color_frame_width, color_frame_height), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
-				cv::Mat bgr8_mat;
-				//cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
-				//new_frames.emplace_back(f);
-			}
+			//for (const rs2::frame& f : frameset_color) {
+			//	
+			//	//save_last_frame("frames\\frame", f);
+			//	// TODO: Currently, the format of the frame data is only RS2_FORMAT_RGB8, RS2_FORMAT_BGR8 causes exception....
+			//	const void * color_frame_data = f.get_data();
+			//	cv::Mat rgb8_mat(cv::Size(color_frame_width, color_frame_height), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
+			//	cv::Mat bgr8_mat(cv::Size(color_frame_width, color_frame_height), CV_8UC3);
+			//	cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
+			//	//new_frames.emplace_back(f);
+			//}
+
+			const void * color_frame_data = color.get_data();
+			cv::Mat rgb8_mat(cv::Size(color.get_width(), color.get_height()), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
+			cv::Mat bgr8_mat(cv::Size(color.get_width(), color.get_height()), CV_8UC3);
+			cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
+
+			//TODO: Create table of time, 2d distances, 3d distances
+
 
 			// convert the newly-arrived frames to render-firendly format
 			for (const auto& frame : fs)
