@@ -8,6 +8,7 @@
 #include <iostream>
 #include "rb_aux.h"
 #include <opencv2/opencv.hpp>
+
 int main(int argc, char * argv[]) try
 {
 	window app(1280, 720, "RealtimeBreathing");
@@ -28,6 +29,8 @@ int main(int argc, char * argv[]) try
 	// that should not be performed in the main loop
 	rs2::align align_to_depth(RS2_STREAM_DEPTH);
 	rs2::align align_to_color(RS2_STREAM_COLOR);
+
+	FrameManager frame_manager;
 
 	bool show_camera_stream = false;
 	bool stream_enabled = false;
@@ -86,13 +89,8 @@ int main(int argc, char * argv[]) try
 			//	//new_frames.emplace_back(f);
 			//}
 
-			const void * color_frame_data = color.get_data();
-			cv::Mat rgb8_mat(cv::Size(color.get_width(), color.get_height()), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
-			cv::Mat bgr8_mat(cv::Size(color.get_width(), color.get_height()), CV_8UC3);
-			cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
-
-			//TODO: Create table of time, 2d distances, 3d distances
-
+			//TODO: 3d distances
+			frame_manager.process_color_frame(color);
 
 			// convert the newly-arrived frames to render-firendly format
 			for (const auto& frame : fs)
