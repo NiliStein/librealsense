@@ -93,23 +93,28 @@ void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
 	// Create bgr mode matrix of color_frame
 	const void * color_frame_data = color_frame.get_data();
 	cv::Mat rgb8_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
-	cv::Mat bgr8_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
-	cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
+	cv::Mat hsv8_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
+	cv::cvtColor(rgb8_mat, hsv8_mat, cv::COLOR_RGB2HSV);
 
 	BreathingFrameData * breathing_data = new BreathingFrameData();
 
 	//find yellows:
 	cv::Mat yellow_only_mask(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC1);
-	inRange(bgr8_mat, cv::Scalar(0, 180, 255), cv::Scalar(170, 255, 255), yellow_only_mask); //yellow bgr range
+	inRange(hsv8_mat, cv::Scalar(20, 100, 100), cv::Scalar(30, 255, 255), yellow_only_mask); //yellow bgr range
 	cv::Mat yellow_only_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, cv::Scalar(0, 0, 0));
-	bgr8_mat.copyTo(yellow_only_mat, yellow_only_mask);
+	hsv8_mat.copyTo(yellow_only_mat, yellow_only_mask);
+
+	// TODO: For Debug only, remove when finished
+	cv::imwrite("frames\\only_yellow.jpg", yellow_only_mat);
 
 
-
-	//Convert it to gray
-	int channels = yellow_only_mat.channels();
+	//Pick up the grayscale
+	cv::Mat yellow_only_bgr8_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
+	cvtColor(yellow_only_mat, yellow_only_bgr8_mat, cv::COLOR_HSV2BGR);
 	cv::Mat yellow_only_grayscale_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
-	cvtColor(yellow_only_mat, yellow_only_grayscale_mat, cv::COLOR_BGR2GRAY);
+	cvtColor(yellow_only_bgr8_mat, yellow_only_grayscale_mat, cv::COLOR_BGR2GRAY);
+
+	cv::imwrite("frames\\yellow_grayscale.jpg", yellow_only_grayscale_mat);
 
 	//find circles:
 	//Reduce the noise so we avoid false circle detection

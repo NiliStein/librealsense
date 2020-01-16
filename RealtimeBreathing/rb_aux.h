@@ -50,6 +50,7 @@ public:
 	 *
 	 */
 	void process_color_frame(const rs2::video_frame& color_frame);
+
 private:
 	/**
 	 * Cleans all allocated resources
