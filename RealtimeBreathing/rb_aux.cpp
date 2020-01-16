@@ -10,8 +10,6 @@
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
 #define CALC_3D_DIST(name1,depth1,name2,depth2) { distance3D((*(name1))[0], (*(name1))[1], (depth1), (*(name2))[0], (*(name2))[1], (depth2)) }
 
-using namespace cv;
-
 static float distance2D(float x, float y, float a, float b) {
 	return sqrt(pow(x - a, 2) + pow(y - b, 2));
 }
@@ -22,14 +20,14 @@ static float distance3D(float x, float y, float z, float a, float b, float c) {
 
 static struct compareCirclesByY {
 	//returns true if c2's y is greater than c1's y.
-	bool operator() (Vec3f& c1, Vec3f& c2) {
+	bool operator() (cv::Vec3f& c1, cv::Vec3f& c2) {
 		return (c1[1] < c2[1]);
 	}
 } compareCirclesByYFunc;
 
 static struct compareCirclesByX {
 	//returns true if c2's x is greater than c1's x.
-	bool operator() (Vec3f& c1, Vec3f& c2) {
+	bool operator() (cv::Vec3f& c1, cv::Vec3f& c2) {
 		return (c1[0] < c2[0]);
 	}
 } compareCirclesByXFunc;
@@ -101,25 +99,28 @@ void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
 	BreathingFrameData * breathing_data = new BreathingFrameData();
 
 	//find yellows:
-	Mat yellow_only_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
-	inRange(bgr8_mat, Scalar(0, 180, 255), Scalar(170, 255, 255), yellow_only_mat); //yellow bgr range
+	cv::Mat yellow_only_mask(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC1);
+	inRange(bgr8_mat, cv::Scalar(0, 180, 255), cv::Scalar(170, 255, 255), yellow_only_mask); //yellow bgr range
+	cv::Mat yellow_only_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, cv::Scalar(0, 0, 0));
+	bgr8_mat.copyTo(yellow_only_mat, yellow_only_mask);
 
-	int channels = yellow_only_mat.channels();
+
+
 	//Convert it to gray
-	Mat yellow_only_grayscale_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
-	cvtColor(yellow_only_mat, yellow_only_grayscale_mat, COLOR_BGR2GRAY);
+	int channels = yellow_only_mat.channels();
+	cv::Mat yellow_only_grayscale_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
+	cvtColor(yellow_only_mat, yellow_only_grayscale_mat, cv::COLOR_BGR2GRAY);
 
 	//find circles:
 	//Reduce the noise so we avoid false circle detection
-	GaussianBlur(yellow_only_grayscale_mat, yellow_only_grayscale_mat, Size(9, 9), 2, 2);
+	GaussianBlur(yellow_only_grayscale_mat, yellow_only_grayscale_mat, cv::Size(9, 9), 2, 2);
 	//Apply Hough:
-	HoughCircles(yellow_only_grayscale_mat, breathing_data->circles, HOUGH_GRADIENT,
+	HoughCircles(yellow_only_grayscale_mat, breathing_data->circles, cv::HOUGH_GRADIENT,
 		2,   // accumulator resolution (size of the image / 2)
 		5,  // minimum distance between two circles
 		100, // Canny high threshold
 		100, // minimum number of votes
 		0, 1000); // min and max radius
-
 
 	//distinguish between stickers:
 	if (breathing_data->circles.size() < 4) //no circles found
@@ -150,7 +151,6 @@ void FrameManager::cleanup()
 
 void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 {
-	// TODO: Implement
 	// delete last frame
 	if (_frame_data_arr[_oldest_frame_index] != NULL) {
 		free(_frame_data_arr[_oldest_frame_index]);
