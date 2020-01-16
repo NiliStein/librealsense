@@ -119,18 +119,23 @@ void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
 	//find circles:
 	//Reduce the noise so we avoid false circle detection
 	GaussianBlur(yellow_only_grayscale_mat, yellow_only_grayscale_mat, cv::Size(9, 9), 2, 2);
+	
+	cv::imwrite("frames\\yellow_grayscale_gaussian.jpg", yellow_only_grayscale_mat);
+	
 	//Apply Hough:
+	// TODO: Optimize these values to accurately identify the circles
 	HoughCircles(yellow_only_grayscale_mat, breathing_data->circles, cv::HOUGH_GRADIENT,
 		2,   // accumulator resolution (size of the image / 2)
 		5,  // minimum distance between two circles
 		100, // Canny high threshold
 		100, // minimum number of votes
-		0, 1000); // min and max radius
+		0, -1); // min and max radius
 
 	//distinguish between stickers:
-	if (breathing_data->circles.size() < 4) //no circles found
+	if (breathing_data->circles.size() < 4) {//no circles found
 		cleanup();
 		return;
+	}
 	breathing_data->UpdateStickersLoactions();
 
 	//calculate distances:
@@ -172,7 +177,7 @@ void BreathingFrameData::UpdateStickersLoactions()
 	//sort vec by y:
 	std::sort(circles.begin(), circles.end(), compareCirclesByYFunc);
 	//sort 2 highest by x:
-	std::sort(circles.begin(), circles.begin() + 1, compareCirclesByXFunc);
+	std::sort(circles.begin(), circles.begin() + 2, compareCirclesByXFunc);
 
 	left = &circles[0];
 	right = &circles[1];
