@@ -118,18 +118,29 @@ void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
 
 	//find circles:
 	//Reduce the noise so we avoid false circle detection
-	GaussianBlur(yellow_only_grayscale_mat, yellow_only_grayscale_mat, cv::Size(9, 9), 2, 2);
+	//GaussianBlur(yellow_only_grayscale_mat, yellow_only_grayscale_mat, cv::Size(9, 9), 2, 2);
 	
 	cv::imwrite("frames\\yellow_grayscale_gaussian.jpg", yellow_only_grayscale_mat);
+
+	//create binary image:
+	cv::Mat image_th;
+	cv::Mat bin_mat(yellow_only_grayscale_mat.size(), yellow_only_grayscale_mat.type());
+	cv::adaptiveThreshold(yellow_only_grayscale_mat, image_th, 255,
+		cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY_INV, 3, 5);
 	
-	//Apply Hough:
-	// TODO: Optimize these values to accurately identify the circles
-	HoughCircles(yellow_only_grayscale_mat, breathing_data->circles, cv::HOUGH_GRADIENT,
-		2,   // accumulator resolution (size of the image / 2)
-		5,  // minimum distance between two circles
-		100, // Canny high threshold
-		100, // minimum number of votes
-		0, -1); // min and max radius
+	//connected components:
+	cv::Mat1i labels;
+	cv::Mat1i stats;
+	cv::Mat1d centroids;
+	cv::connectedComponentsWithStats(image_th, labels, stats, centroids);
+
+	//get centers:
+	for (int i = 0; i < centroids.rows; i++)
+	{
+		breathing_data->circles.push_back(cv::Vec3f(centroids(i, 0), centroids(i, 1)));
+		circle(rgb8_mat, cv::Point(centroids(i, 0), centroids(i, 1)), 3, cv::Scalar(0, 255, 0));
+	}
+
 
 	//distinguish between stickers:
 	if (breathing_data->circles.size() < 4) {//no circles found
