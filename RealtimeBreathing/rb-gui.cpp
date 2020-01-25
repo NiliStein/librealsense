@@ -9,6 +9,28 @@
 #include "rb_aux.h"
 #include <opencv2/opencv.hpp>
 
+// copied os.h because project does comile when including it (seems to be due to double inclusion of rendering.h)
+// *****	START of os.h copy	*****
+
+//#pragma once
+//#include <vector>
+//#include <string>
+//#include <rendering.h>
+//struct GLFWmonitor;
+//struct GLFWwindow;
+
+namespace rs2
+{
+	// Wrapper for cross-platform dialog control
+	enum file_dialog_mode {
+		open_file = (1 << 0),
+		save_file = (1 << 1),
+	};
+	const char* file_dialog_open(file_dialog_mode flags, const char* filters, const char* default_path, const char* default_name);
+}
+
+// *****	END of os.h copy	*****
+
 int main(int argc, char * argv[]) try
 {
 	window app(1280, 720, "RealtimeBreathing");
@@ -36,27 +58,116 @@ int main(int argc, char * argv[]) try
 	bool stream_enabled = false;
 	bool start_camera = false;
 
+	const char* filename = nullptr;	// filename will hold the name of an existing file chosen bu user to analyze.
+									// defined here, so that nullity can indeicate if file was already chosen or not.
+	bool run_on_existing_file = false; //When true, run analysis for an existing file chosen by user through open_dialog
+
 	while (app) // application still alive?
 	{
+
+		// Flags for displaying ImGui window
+		static const int flags = ImGuiWindowFlags_NoCollapse
+			| ImGuiWindowFlags_NoSavedSettings
+			//	| ImGuiWindowFlags_NoResize
+			| ImGuiWindowFlags_AlwaysAutoResize;
 
 		// render the ui:
 		ImGui_ImplGlfw_NewFrame(1);
 		//ImGui::NewFrame();
 
-		ImGui::Begin("Menu"); // Create a window called "Menu" and append into it
+		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
+		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
 		ImGui::End();
-		if (show_camera_stream) {
 
-			ImGui::Begin("Stream");
+		//if (show_camera_stream) {
 
-			if (!stream_enabled) {
-				cfg.enable_stream(RS2_STREAM_DEPTH);
-				cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
-				pipe.start(cfg);
+			//if (!stream_enabled) {
+			//	cfg.enable_stream(RS2_STREAM_DEPTH);
+			//	cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
+			//	pipe.start(cfg);
 
-				stream_enabled = true;
+			//	stream_enabled = true;
+			//}
+
+			if (!show_camera_stream && stream_enabled) {
+				/*
+				if "show camera" was unchecked, make sure stream is disabled
+				*/
+				cfg.disable_stream(RS2_STREAM_DEPTH);
+				cfg.disable_stream(RS2_STREAM_COLOR);
+				pipe.stop();
+				stream_enabled = false;
 			}
+
+			if (!run_on_existing_file && filename) {
+				/*
+				if run on file was unchecked, make sure pipe is stopped
+				*/
+				cfg.disable_all_streams();
+				cfg = rs2::config();
+				pipe.stop();
+				//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
+				filename = nullptr;
+			}
+
+			if (show_camera_stream && !run_on_existing_file) {
+				if (filename) {
+					/*
+					if run on file was unchecked, make sure pipe is stopped
+					*/
+					cfg.disable_all_streams();
+					cfg = rs2::config();
+					pipe.stop();
+					//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
+					filename = nullptr;
+				}
+
+				if (!stream_enabled) {
+					cfg.enable_stream(RS2_STREAM_DEPTH);
+					cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
+					pipe.start(cfg);
+					stream_enabled = true;
+				}
+			}
+			if (!show_camera_stream && run_on_existing_file) {
+				if (!filename) {
+					filename = rs2::file_dialog_open(rs2::file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL);
+					cfg.enable_device_from_file(filename);
+					pipe.start(cfg); //File will be opened in read mode at this point
+
+				}
+			}
+			if (!show_camera_stream && !run_on_existing_file) {
+				if (filename) {
+					/*
+					if run on file was unchecked, make sure pipe is stopped
+					*/
+					cfg.disable_all_streams();
+					cfg = rs2::config();
+					pipe.stop();
+					//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
+					filename = nullptr;
+				}
+
+				if (stream_enabled) {
+					/*
+					if "show camera" was unchecked, make sure stream is disabled
+					*/
+					cfg.disable_stream(RS2_STREAM_DEPTH);
+					cfg.disable_stream(RS2_STREAM_COLOR);
+					pipe.stop();
+					stream_enabled = false;
+				}
+				ImGui::Render();
+				continue;
+			}
+
+			if (show_camera_stream && run_on_existing_file) {
+				ImGui::Render();
+				continue;
+			}
+
 
 			// using the align object, we block the application until a frameset is available
 			rs2::frameset fs = pipe.wait_for_frames();
@@ -131,18 +242,18 @@ int main(int argc, char * argv[]) try
 				ImGui::TextWrapped("distance from camera is: %f", dist_to_center);
 			}
 #endif
-			ImGui::End();
+			//ImGui::End();
 
-		} else { //stop camera:
-			if (stream_enabled) {
-				cfg.disable_stream(RS2_STREAM_DEPTH);
-				cfg.disable_stream(RS2_STREAM_COLOR);
-				pipe.stop();
-				stream_enabled = false;
-			}
-			ImGui::Render();
-			continue;
-		}
+		//} else { //stop camera:
+		//	if (stream_enabled) {
+		//		cfg.disable_stream(RS2_STREAM_DEPTH);
+		//		cfg.disable_stream(RS2_STREAM_COLOR);
+		//		pipe.stop();
+		//		stream_enabled = false;
+		//	}
+		//	ImGui::Render();
+		//	continue;
+		//}
 		
 
 		ImGui::Render();
