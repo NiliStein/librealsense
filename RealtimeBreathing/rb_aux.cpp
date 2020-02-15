@@ -135,7 +135,7 @@ void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
 	cv::connectedComponentsWithStats(image_th, labels, stats, centroids);
 
 	//get centers:
-	for (int i = 0; i < centroids.rows; i++)
+	for (int i = 1; i < centroids.rows; i++) //label 0 is the background
 	{
 		breathing_data->circles.push_back(cv::Vec3f(centroids(i, 0), centroids(i, 1)));
 		circle(rgb8_mat, cv::Point(centroids(i, 0), centroids(i, 1)), 3, cv::Scalar(0, 255, 0));

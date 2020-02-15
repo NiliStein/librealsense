@@ -61,6 +61,7 @@ int main(int argc, char * argv[]) try
 	const char* filename = nullptr;	// filename will hold the name of an existing file chosen bu user to analyze.
 									// defined here, so that nullity can indeicate if file was already chosen or not.
 	bool run_on_existing_file = false; //When true, run analysis for an existing file chosen by user through open_dialog
+	bool recording = false; //When true, record camera stream to file
 
 	while (app) // application still alive?
 	{
@@ -78,7 +79,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
-		ImGui::End();
+		//ImGui::End();
 
 		//if (show_camera_stream) {
 
@@ -90,28 +91,9 @@ int main(int argc, char * argv[]) try
 			//	stream_enabled = true;
 			//}
 
-			if (!show_camera_stream && stream_enabled) {
-				/*
-				if "show camera" was unchecked, make sure stream is disabled
-				*/
-				cfg.disable_stream(RS2_STREAM_DEPTH);
-				cfg.disable_stream(RS2_STREAM_COLOR);
-				pipe.stop();
-				stream_enabled = false;
-			}
-
-			if (!run_on_existing_file && filename) {
-				/*
-				if run on file was unchecked, make sure pipe is stopped
-				*/
-				cfg.disable_all_streams();
-				cfg = rs2::config();
-				pipe.stop();
-				//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
-				filename = nullptr;
-			}
-
+			
 			if (show_camera_stream && !run_on_existing_file) {
+			
 				if (filename) {
 					/*
 					if run on file was unchecked, make sure pipe is stopped
@@ -129,8 +111,41 @@ int main(int argc, char * argv[]) try
 					pipe.start(cfg);
 					stream_enabled = true;
 				}
+
+				if (ImGui::Button("record", { 50, 50 }))
+				{
+					pipe.stop(); // Stop the pipeline with the default configuration
+					const char* out_filename = rs2::file_dialog_open(rs2::file_dialog_mode::save_file, "ROS-bag\0*.bag\0", NULL, NULL);
+					cfg.enable_record_to_file(out_filename);
+					pipe.start(cfg); //File will be opened at this point
+					recording = true;
+				
+				}
+				if (recording) {
+					if (ImGui::Button("stop\nrecord", { 50, 50 }))
+					{
+						cfg.disable_all_streams();
+						cfg = rs2::config();
+						pipe.stop(); // Stop the pipeline that holds the file and the recorder
+						pipe.start(cfg);
+						recording = false;
+					}
+				}
+				
+				
+
 			}
 			if (!show_camera_stream && run_on_existing_file) {
+				if (stream_enabled) {
+					/*
+					if "show camera" was unchecked, make sure stream is disabled
+					*/
+					cfg.disable_stream(RS2_STREAM_DEPTH);
+					cfg.disable_stream(RS2_STREAM_COLOR);
+					pipe.stop();
+					stream_enabled = false;
+				}
+
 				if (!filename) {
 					filename = rs2::file_dialog_open(rs2::file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL);
 					cfg.enable_device_from_file(filename);
@@ -159,11 +174,13 @@ int main(int argc, char * argv[]) try
 					pipe.stop();
 					stream_enabled = false;
 				}
+				ImGui::End();
 				ImGui::Render();
 				continue;
 			}
 
 			if (show_camera_stream && run_on_existing_file) {
+				ImGui::End();
 				ImGui::Render();
 				continue;
 			}
@@ -255,7 +272,7 @@ int main(int argc, char * argv[]) try
 		//	continue;
 		//}
 		
-
+		ImGui::End();
 		ImGui::Render();
 	}
 
