@@ -33,6 +33,7 @@ public:
 	void UpdateStickersLoactions();
 	void CalculateDistances2D();
 	void CalculateDistances3D();
+	std::string GetDescription();
 };
 
 class FrameManager {

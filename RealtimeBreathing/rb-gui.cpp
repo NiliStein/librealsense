@@ -219,6 +219,7 @@ int main(int argc, char * argv[]) try
 
 			//TODO: 3d distances
 			frame_manager.process_color_frame(color);
+			
 
 			// convert the newly-arrived frames to render-firendly format
 			for (const auto& frame : fs)
