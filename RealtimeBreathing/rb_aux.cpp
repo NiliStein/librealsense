@@ -236,15 +236,30 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 void BreathingFrameData::UpdateStickersLoactions()
 {
 	if (circles.size() < NUM_OF_STICKERS) return;
-	//sort vec by y:
-	std::sort(circles.begin(), circles.end(), compareCirclesByYFunc);
-	//sort 2 highest by x:
-	std::sort(circles.begin(), circles.begin() + 2, compareCirclesByXFunc);
+	if (circles.size() == 4) {
+		//sort vec by y:
+		std::sort(circles.begin(), circles.end(), compareCirclesByYFunc);
+		//sort 2 highest by x:
+		std::sort(circles.begin(), circles.begin() + 2, compareCirclesByXFunc);
 
-	left = &circles[0];
-	right = &circles[1];
-	middle = &circles[2];
-	down = &circles[3];
+		left = &circles[0];
+		right = &circles[1];
+		middle = &circles[2];
+		down = &circles[3];
+	}
+	else {
+		// assume 5 stickers, arranged in a T shape
+		//sort vec by y:
+		std::sort(circles.begin(), circles.end(), compareCirclesByYFunc);
+		//sort 3 highest by x:
+		std::sort(circles.begin(), circles.begin() + 3, compareCirclesByXFunc);
+
+		left = &circles[0];
+		right = &circles[2];
+		middle = &circles[3];
+		down = &circles[4];
+	}
+	
 }
 
 void BreathingFrameData::CalculateDistances2D()
