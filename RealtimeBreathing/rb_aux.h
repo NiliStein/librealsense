@@ -11,6 +11,8 @@ class BreathingFrameData {
 public:
 	std::vector<cv::Vec3f> circles; //(x,y,depth)
 	cv::Vec3f *left, *right, *middle, *down; //(x,y,depth)
+	//TODO: adding alternative coordinates in cm, choose one after deciding which is more accurate (dist by pixels or by cm(given by rs2_deproject))
+	cv::Vec3f left_cm, right_cm, middle_cm, down_cm; //(x,y,depth)
 	float dLR, dML, dMR, dMD, dDL, dDR;
 	float dLR_depth, dML_depth, dMR_depth, dMD_depth, dDL_depth, dDR_depth;
 	float average_2d_dist;

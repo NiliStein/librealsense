@@ -1,5 +1,6 @@
 #include "rb_aux.h"
 #include "os.h"
+#include <librealsense2/rsutil.h>
 #include <cstdio>
 #include <string>
 #include <ctime>
@@ -11,9 +12,10 @@
 #include <fstream>
 
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
-#define CALC_3D_DIST(name1,name2) { distance3D((*(name1))[0], (*(name1))[1], (*(name1))[2], (*(name2))[0], (*(name2))[1], (*(name1))[2]) }
+#define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
 #define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define NUM_OF_STICKERS 4
+#define CALC_2D_BY_CM true //if false, calculate by pixels
 
 //TODO: for logging
 std::ofstream logFile("frames\\log.txt");
@@ -25,6 +27,19 @@ static float distance2D(float x, float y, float a, float b) {
 
 static float distance3D(float x, float y, float z, float a, float b, float c) {
 	return sqrt(pow(x - a, 2) + pow(y - b, 2) + pow(z - c, 2));
+}
+
+void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
+	
+	float pixel[2] = { x, y };
+	float point[3]; // From point (in 3D)
+	auto dist = depth_frame.get_distance(pixel[0], pixel[1]);
+	rs2_intrinsics intr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
+	rs2_deproject_pixel_to_point(point, &intr, pixel, dist);
+
+	output[0] = float(point[0]) * 100.0;//convert to cm
+	output[1] = float(point[1]) * 100.0;
+	output[2] = float(point[2]) * 100.0;
 }
 
 static struct compareCirclesByY {
@@ -109,8 +124,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 
 	//find yellows:
 	cv::Mat yellow_only_mask(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC1);
-	//TODO: stricter range, remove if the uncommented range below doesnt add noise
-	//inRange(hsv8_mat, cv::Scalar(20, 100, 100), cv::Scalar(30, 255, 255), yellow_only_mask); //yellow bgr range
+	//hsv official yellow range: (20, 100, 100) to (30, 255, 255)
 	inRange(hsv8_mat, cv::Scalar(20, 50, 50), cv::Scalar(40, 255, 255), yellow_only_mask); //yellow bgr range
 	cv::Mat yellow_only_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, cv::Scalar(0, 0, 0));
 	hsv8_mat.copyTo(yellow_only_mat, yellow_only_mask);
@@ -182,11 +196,20 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	}
 	breathing_data->UpdateStickersLoactions();
 
+	//get 3D cm coordinates
+	get_3d_coordinates(depth_frame, float((*breathing_data->left)[0]), (*breathing_data->left)[1], breathing_data->left_cm);
+	get_3d_coordinates(depth_frame, float((*breathing_data->right)[0]), (*breathing_data->right)[1], breathing_data->right_cm);
+	get_3d_coordinates(depth_frame, float((*breathing_data->middle)[0]), (*breathing_data->middle)[1], breathing_data->middle_cm);
+	get_3d_coordinates(depth_frame, float((*breathing_data->down)[0]), (*breathing_data->down)[1], breathing_data->down_cm);
+
+
 	//calculate 2D distances:
 	breathing_data->CalculateDistances2D();
+
 	//add color timestamp:
 	breathing_data->color_timestamp = color_frame.get_timestamp();
 
+	/*
 	//get depth of centroids:
 	cv::Vec3f& left_ref = *(breathing_data->left);
 	cv::Vec3f& right_ref = *(breathing_data->right);
@@ -196,9 +219,12 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	right_ref[2] = depth_frame.get_distance(right_ref[0], right_ref[1]);
 	middle_ref[2] = depth_frame.get_distance(middle_ref[0], middle_ref[1]);
 	down_ref[2] = depth_frame.get_distance(down_ref[0], down_ref[1]);
+	*/
+
 
 	//calculate 3D distances:
 	breathing_data->CalculateDistances3D();
+	
 	//add depth timestamp:
 	breathing_data->depth_timestamp = depth_frame.get_timestamp();
 
@@ -265,26 +291,54 @@ void BreathingFrameData::UpdateStickersLoactions()
 void BreathingFrameData::CalculateDistances2D()
 {
 	if (!left || !right || !middle || !down) return;
-	dLR = CALC_2D_DIST(left, right);
-	dML = CALC_2D_DIST(middle, left);
-	dMR = CALC_2D_DIST(middle, right);
-	dMD = CALC_2D_DIST(middle, down);
-	dDL = CALC_2D_DIST(down, left);
-	dDR = CALC_2D_DIST(down, right);
 
+	if (CALC_2D_BY_CM) {
+
+		dLR = CALC_2D_DIST((&left_cm), (&right_cm));
+		dML = CALC_2D_DIST((&middle_cm), (&left_cm));
+		dMR = CALC_2D_DIST((&middle_cm), (&right_cm));
+		dMD = CALC_2D_DIST((&middle_cm), (&down_cm));
+		dDL = CALC_2D_DIST((&down_cm), (&left_cm));
+		dDR = CALC_2D_DIST((&down_cm), (&right_cm));
+
+	}
+	else {
+		
+		dLR = CALC_2D_DIST(left, right);
+		dML = CALC_2D_DIST(middle, left);
+		dMR = CALC_2D_DIST(middle, right);
+		dMD = CALC_2D_DIST(middle, down);
+		dDL = CALC_2D_DIST(down, left);
+		dDR = CALC_2D_DIST(down, right);
+	}
+	
 	//calculate average:
 	average_2d_dist = (dLR + dML + dMR + dMD + dDL + dDR) / 6;
 }
 
+
+
 void BreathingFrameData::CalculateDistances3D()
 {
 	if (!left || !right || !middle || !down) return;
+
+	dLR_depth = CALC_3D_DIST(left_cm, right_cm);
+	dML_depth = CALC_3D_DIST(middle_cm, left_cm);
+	dMR_depth = CALC_3D_DIST(middle_cm, right_cm);
+	dMD_depth = CALC_3D_DIST(middle_cm, down_cm);
+	dDL_depth = CALC_3D_DIST(down_cm, left_cm);
+	dDR_depth = CALC_3D_DIST(down_cm, right_cm);
+	
+	//commented code calculates 3D dists by pixels
+	/*
+	if (!left || !right || !middle || !down) return;
 	dLR_depth = CALC_3D_DIST(left, right);
-	dML_depth = CALC_3D_DIST(middle, left);
-	dMR_depth = CALC_3D_DIST(middle, right);
-	dMD_depth = CALC_3D_DIST(middle, down);
-	dDL_depth = CALC_3D_DIST(down, left);
-	dDR_depth = CALC_3D_DIST(down, right);
+	dML_depth = CALC_3D_DIST(left, right);
+	dMR_depth = CALC_3D_DIST(left, right);
+	dMD_depth = CALC_3D_DIST(left, right);
+	dDL_depth = CALC_3D_DIST(left, right);
+	dDR_depth = CALC_3D_DIST(left, right);
+	*/
 
 	//calculate average:
 	average_3d_dist = (dLR_depth + dML_depth + dMR_depth + dMD_depth + dDL_depth + dDR_depth) / 6;
@@ -295,10 +349,10 @@ std::string BreathingFrameData::GetDescription()
 {
 	std::string desc = "Color timestamp: " + std::to_string(color_timestamp) +
 		"\nDepth timestamp: " + std::to_string(depth_timestamp) +
-		"\nCoordinates left: " + COORDINATES_TO_STRING(left) +
-		"\nCoordinates right: " + COORDINATES_TO_STRING(right) +
-		"\nCoordinates middle: " + COORDINATES_TO_STRING(middle) +
-		"\nCoordinates down: " + COORDINATES_TO_STRING(down) +
+		"\nCoordinates left: " + COORDINATES_TO_STRING((&left_cm)) +
+		"\nCoordinates right: " + COORDINATES_TO_STRING((&right_cm)) +
+		"\nCoordinates middle: " + COORDINATES_TO_STRING((&middle_cm)) +
+		"\nCoordinates down: " + COORDINATES_TO_STRING((&down_cm)) +
 		"\n2D distances:" +
 		"\nleft-right: " + std::to_string(dLR) +
 		"\nmiddle-left: " + std::to_string(dML) +
