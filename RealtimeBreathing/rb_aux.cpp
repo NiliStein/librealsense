@@ -11,7 +11,7 @@
 #include <fstream>
 
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
-#define CALC_3D_DIST(name1,depth1,name2,depth2) { distance3D((*(name1))[0], (*(name1))[1], (depth1), (*(name2))[0], (*(name2))[1], (depth2)) }
+#define CALC_3D_DIST(name1,name2) { distance3D((*(name1))[0], (*(name1))[1], (*(name1))[2], (*(name2))[0], (*(name2))[1], (*(name1))[2]) }
 #define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define NUM_OF_STICKERS 4
 
@@ -96,7 +96,7 @@ FrameManager::~FrameManager()
 	}
 }
 
-void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
+void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame)
 {
 
 	// Create bgr mode matrix of color_frame
@@ -138,7 +138,7 @@ void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
 	cv::Mat bin_mat(yellow_only_grayscale_mat.size(), yellow_only_grayscale_mat.type());
 	
 	//TODO: simple threshold worked better than adaptive
-	cv::threshold(yellow_only_grayscale_mat, image_th, 127, 255, cv::THRESH_BINARY);
+	cv::threshold(yellow_only_grayscale_mat, image_th, 100, 255, cv::THRESH_BINARY);
 	//TODO: remove?
 	//cv::adaptiveThreshold(yellow_only_grayscale_mat, image_th, 255,
 	//	cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY_INV, 3, 5);
@@ -182,18 +182,27 @@ void FrameManager::process_color_frame(const rs2::video_frame& color_frame)
 	}
 	breathing_data->UpdateStickersLoactions();
 
-	//TODO: get depth of centroids
-	
-
-	//calculate distances:
+	//calculate 2D distances:
 	breathing_data->CalculateDistances2D();
-	//add timestamp:
+	//add color timestamp:
 	breathing_data->color_timestamp = color_frame.get_timestamp();
 
+	//get depth of centroids:
+	cv::Vec3f& left_ref = *(breathing_data->left);
+	cv::Vec3f& right_ref = *(breathing_data->right);
+	cv::Vec3f& middle_ref = *(breathing_data->middle);
+	cv::Vec3f& down_ref = *(breathing_data->down);
+	left_ref[2] = depth_frame.get_distance(left_ref[0],left_ref[1]);
+	right_ref[2] = depth_frame.get_distance(right_ref[0], right_ref[1]);
+	middle_ref[2] = depth_frame.get_distance(middle_ref[0], middle_ref[1]);
+	down_ref[2] = depth_frame.get_distance(down_ref[0], down_ref[1]);
 
-	//TODO: calc depth of centroids and calc 3D distances
+	//calculate 3D distances:
+	breathing_data->CalculateDistances3D();
+	//add depth timestamp:
+	breathing_data->depth_timestamp = depth_frame.get_timestamp();
 
-	//TOO: for logging
+	//TODO: for logging
 	logFile << breathing_data->GetDescription();
 	
 	add_frame_data(breathing_data);
@@ -255,12 +264,12 @@ void BreathingFrameData::CalculateDistances2D()
 void BreathingFrameData::CalculateDistances3D()
 {
 	if (!left || !right || !middle || !down) return;
-	dLR_depth = CALC_3D_DIST(left, left_depth, right, right_depth);
-	dML_depth = CALC_3D_DIST(middle, middle_depth, left, left_depth);
-	dMR_depth = CALC_3D_DIST(middle, middle_depth, right, right_depth);
-	dMD_depth = CALC_3D_DIST(middle, middle_depth, down, down_depth);
-	dDL_depth = CALC_3D_DIST(down, down_depth, left, left_depth);
-	dDR_depth = CALC_3D_DIST(down, down_depth, right, right_depth);
+	dLR_depth = CALC_3D_DIST(left, right);
+	dML_depth = CALC_3D_DIST(middle, left);
+	dMR_depth = CALC_3D_DIST(middle, right);
+	dMD_depth = CALC_3D_DIST(middle, down);
+	dDL_depth = CALC_3D_DIST(down, left);
+	dDR_depth = CALC_3D_DIST(down, right);
 
 	//calculate average:
 	average_3d_dist = (dLR_depth + dML_depth + dMR_depth + dMD_depth + dDL_depth + dDR_depth) / 6;

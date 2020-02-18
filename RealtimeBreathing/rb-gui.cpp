@@ -217,25 +217,19 @@ int main(int argc, char * argv[]) try
 			//	//new_frames.emplace_back(f);
 			//}
 
-			//TODO: 3d distances
-			frame_manager.process_color_frame(color);
+			frame_manager.process_frame(color, depth);
 			
 
 			// convert the newly-arrived frames to render-firendly format
-			for (const auto& frame : fs)
-			{
-				render_frames[frame.get_profile().unique_id()] = colorizer.process(frame);
-			}
+			//for (const auto& frame : fs) //iterate over all available frames. removed to ignore IR emmitter frames.
+			//{
+				render_frames[color.get_profile().unique_id()] = colorizer.process(color);
+				render_frames[depth.get_profile().unique_id()] = colorizer.process(depth);
+			//}
 
 			// present all the collected frames with opengl mosaic
 			app.show(render_frames);
 
-			
-
-			//the following commented code was the previous implementation to the division to two images of depth and color:
-			////two split frames in app, left for color and right for depth:
-			//depth_image.render(colorized_depth, { 640, 360, app.width() / 2, app.height() / 2 });
-			//color_image.render(color, { 0, 360, app.width() / 2, app.height() / 2 });
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);

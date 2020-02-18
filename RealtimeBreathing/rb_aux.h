@@ -9,9 +9,8 @@ void save_last_frame(const char* filename, const rs2::video_frame& frame);
 
 class BreathingFrameData {
 public:
-	std::vector<cv::Vec3f> circles;
-	cv::Vec3f *left, *right, *middle, *down;
-	float left_depth, right_depth, middle_depth, down_depth;
+	std::vector<cv::Vec3f> circles; //(x,y,depth)
+	cv::Vec3f *left, *right, *middle, *down; //(x,y,depth)
 	float dLR, dML, dMR, dMD, dDL, dDR;
 	float dLR_depth, dML_depth, dMR_depth, dMD_depth, dDL_depth, dDR_depth;
 	float average_2d_dist;
@@ -50,7 +49,7 @@ public:
 	 * @param frame - a video frame from the camera
 	 *
 	 */
-	void process_color_frame(const rs2::video_frame& color_frame);
+	void process_frame(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame);
 
 private:
 	/**
