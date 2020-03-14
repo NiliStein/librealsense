@@ -5,8 +5,9 @@
 #include <string>
 #include <ctime>
 #include <sstream>
-#include <opencv2/imgproc/imgproc.hpp>
+//#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
+
 
 //TODO: for logging
 #include <fstream>
@@ -14,7 +15,7 @@
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
 #define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
 #define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
-#define NUM_OF_STICKERS 4
+#define NUM_OF_STICKERS 5
 #define CALC_2D_BY_CM true //if false, calculate by pixels
 
 //TODO: for logging
@@ -95,7 +96,7 @@ static struct compareCirclesByX {
 //}
 
 FrameManager::FrameManager(unsigned int n_frames, const char * frame_disk_path) :
-	_n_frames(n_frames), _frame_disk_path(frame_disk_path), _oldest_frame_index(0)
+	_n_frames(n_frames), _frame_disk_path(frame_disk_path), _oldest_frame_index(0), user_cfg(Config(CONFIG_FILEPATH))
 {
 	_frame_data_arr = new BreathingFrameData*[_n_frames];
 	for (unsigned int i = 0; i < _n_frames; i++) {
@@ -199,8 +200,11 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//get 3D cm coordinates
 	get_3d_coordinates(depth_frame, float((*breathing_data->left)[0]), (*breathing_data->left)[1], breathing_data->left_cm);
 	get_3d_coordinates(depth_frame, float((*breathing_data->right)[0]), (*breathing_data->right)[1], breathing_data->right_cm);
-	get_3d_coordinates(depth_frame, float((*breathing_data->middle)[0]), (*breathing_data->middle)[1], breathing_data->middle_cm);
-	get_3d_coordinates(depth_frame, float((*breathing_data->down)[0]), (*breathing_data->down)[1], breathing_data->down_cm);
+	if (NUM_OF_STICKERS == 5) {
+		get_3d_coordinates(depth_frame, float((*breathing_data->mid1)[0]), (*breathing_data->mid1)[1], breathing_data->mid1_cm);
+	}
+	get_3d_coordinates(depth_frame, float((*breathing_data->mid2)[0]), (*breathing_data->mid2)[1], breathing_data->mid2_cm);
+	get_3d_coordinates(depth_frame, float((*breathing_data->mid3)[0]), (*breathing_data->mid3)[1], breathing_data->mid3_cm);
 
 
 	//calculate 2D distances:
@@ -230,6 +234,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 
 	//TODO: for logging
 	logFile << breathing_data->GetDescription();
+	logFile << user_cfg.mode;
 	
 	add_frame_data(breathing_data);
 }
@@ -263,6 +268,7 @@ void BreathingFrameData::UpdateStickersLoactions()
 {
 	if (circles.size() < NUM_OF_STICKERS) return;
 	if (circles.size() == 4) {
+		// no mid1 sticker
 		//sort vec by y:
 		std::sort(circles.begin(), circles.end(), compareCirclesByYFunc);
 		//sort 2 highest by x:
@@ -270,8 +276,8 @@ void BreathingFrameData::UpdateStickersLoactions()
 
 		left = &circles[0];
 		right = &circles[1];
-		middle = &circles[2];
-		down = &circles[3];
+		mid2 = &circles[2];
+		mid3 = &circles[3];
 	}
 	else {
 		// assume 5 stickers, arranged in a T shape
@@ -282,66 +288,90 @@ void BreathingFrameData::UpdateStickersLoactions()
 
 		left = &circles[0];
 		right = &circles[2];
-		middle = &circles[3];
-		down = &circles[4];
+		mid1 = &circles[1];
+		mid2 = &circles[3];
+		mid3 = &circles[4];
 	}
 	
 }
 
 void BreathingFrameData::CalculateDistances2D()
 {
-	if (!left || !right || !middle || !down) return;
+	if (!left || !right || !mid2 || !mid3) return;
+	if (NUM_OF_STICKERS == 5 && !mid1) return;
 
 	if (CALC_2D_BY_CM) {
 
+		
+		dLM2 = CALC_2D_DIST((&left_cm), (&mid2_cm));
+		dLM3 = CALC_2D_DIST((&left_cm), (&mid3_cm));
 		dLR = CALC_2D_DIST((&left_cm), (&right_cm));
-		dML = CALC_2D_DIST((&middle_cm), (&left_cm));
-		dMR = CALC_2D_DIST((&middle_cm), (&right_cm));
-		dMD = CALC_2D_DIST((&middle_cm), (&down_cm));
-		dDL = CALC_2D_DIST((&down_cm), (&left_cm));
-		dDR = CALC_2D_DIST((&down_cm), (&right_cm));
-
+		dRM2 = CALC_2D_DIST((&right_cm), (&mid2_cm));
+		dRM3 = CALC_2D_DIST((&right_cm), (&mid3_cm)); 
+		dM2M3 = CALC_2D_DIST((&mid2_cm), (&mid3_cm));
+		if (NUM_OF_STICKERS == 5) {		//sticker mid1 exists
+			dLM1 = CALC_2D_DIST((&left_cm), (&mid1_cm));
+			dRM1 = CALC_2D_DIST((&right_cm), (&mid1_cm));
+			dM1M2 = CALC_2D_DIST((&mid1_cm), (&mid2_cm));
+			dM1M3 = CALC_2D_DIST((&mid1_cm), (&mid3_cm));
+		}
 	}
 	else {
-		
+		dLM2 = CALC_2D_DIST(left, mid2);
+		dLM3 = CALC_2D_DIST(left, mid3);
 		dLR = CALC_2D_DIST(left, right);
-		dML = CALC_2D_DIST(middle, left);
-		dMR = CALC_2D_DIST(middle, right);
-		dMD = CALC_2D_DIST(middle, down);
-		dDL = CALC_2D_DIST(down, left);
-		dDR = CALC_2D_DIST(down, right);
+		dRM2 = CALC_2D_DIST(right, mid2);
+		dRM3 = CALC_2D_DIST(right, mid3);
+		dM2M3 = CALC_2D_DIST(mid2, mid3);
+		if (NUM_OF_STICKERS == 5) {		//sticker mid1 exists
+			dLM1 = CALC_2D_DIST(left, mid1);
+			dRM1 = CALC_2D_DIST(right, mid1);
+			dM1M2 = CALC_2D_DIST(mid1, mid2);
+			dM1M3 = CALC_2D_DIST(mid1, mid3);
+		}
 	}
 	
 	//calculate average:
-	average_2d_dist = (dLR + dML + dMR + dMD + dDL + dDR) / 6;
+	if (NUM_OF_STICKERS == 5) {
+		average_2d_dist = (dLM1 + dLM2 + dLM3 + dLR + dRM1 + dRM2 + dRM3 + dM1M2 + dM1M3 + dM2M3) / 10;
+	}
+	else {
+		average_2d_dist = (dLM2 + dLM3 + dLR + dRM2 + dRM3 + dM2M3) / 6;
+	}
+
 }
 
 
 
 void BreathingFrameData::CalculateDistances3D()
 {
-	if (!left || !right || !middle || !down) return;
+	if (!left || !right || !mid2 || !mid3) return;
+	if (NUM_OF_STICKERS == 5 && !mid1) return;
 
-	dLR_depth = CALC_3D_DIST(left_cm, right_cm);
-	dML_depth = CALC_3D_DIST(middle_cm, left_cm);
-	dMR_depth = CALC_3D_DIST(middle_cm, right_cm);
-	dMD_depth = CALC_3D_DIST(middle_cm, down_cm);
-	dDL_depth = CALC_3D_DIST(down_cm, left_cm);
-	dDR_depth = CALC_3D_DIST(down_cm, right_cm);
+
 	
-	//commented code calculates 3D dists by pixels
-	/*
-	if (!left || !right || !middle || !down) return;
-	dLR_depth = CALC_3D_DIST(left, right);
-	dML_depth = CALC_3D_DIST(left, right);
-	dMR_depth = CALC_3D_DIST(left, right);
-	dMD_depth = CALC_3D_DIST(left, right);
-	dDL_depth = CALC_3D_DIST(left, right);
-	dDR_depth = CALC_3D_DIST(left, right);
-	*/
+	dLM2_depth = CALC_3D_DIST(left_cm, mid2_cm); 
+	dLM3_depth = CALC_3D_DIST(left_cm, mid3_cm); 
+	dLR_depth = CALC_3D_DIST(left_cm, right_cm); 
+	dRM2_depth = CALC_3D_DIST(right_cm, mid2_cm);
+	dRM3_depth = CALC_3D_DIST(right_cm, mid3_cm);
+	dM2M3_depth = CALC_3D_DIST(mid2_cm, mid3_cm);
+	if (NUM_OF_STICKERS == 5) {		//sticker mid1 exists
+		dLM1_depth = CALC_3D_DIST(left_cm, mid1_cm);
+		dRM1_depth = CALC_3D_DIST(right_cm, mid1_cm);
+		dM1M2_depth = CALC_3D_DIST(mid1_cm, mid2_cm);
+		dM1M3_depth = CALC_3D_DIST(mid1_cm, mid3_cm);
+	}
+
 
 	//calculate average:
-	average_3d_dist = (dLR_depth + dML_depth + dMR_depth + dMD_depth + dDL_depth + dDR_depth) / 6;
+	if (NUM_OF_STICKERS == 5) {
+		average_3d_dist = (dLM1_depth + dLM2_depth + dLM3_depth + dLR_depth + dRM1_depth + dRM2_depth + dRM3_depth + dM1M2_depth + dM1M3_depth + dM2M3_depth) / 10;
+	}
+	else {
+		average_3d_dist = (dLM2_depth + dLM3_depth + dLR_depth + dRM2_depth + dRM3_depth + dM2M3_depth) / 6;
+	}
+	
 
 }
 
@@ -350,27 +380,90 @@ std::string BreathingFrameData::GetDescription()
 	std::string desc = "Color timestamp: " + std::to_string(color_timestamp) +
 		"\nDepth timestamp: " + std::to_string(depth_timestamp) +
 		"\nCoordinates left: " + COORDINATES_TO_STRING((&left_cm)) +
-		"\nCoordinates right: " + COORDINATES_TO_STRING((&right_cm)) +
-		"\nCoordinates middle: " + COORDINATES_TO_STRING((&middle_cm)) +
-		"\nCoordinates down: " + COORDINATES_TO_STRING((&down_cm)) +
-		"\n2D distances:" +
-		"\nleft-right: " + std::to_string(dLR) +
-		"\nmiddle-left: " + std::to_string(dML) +
-		"\nmiddle-right: " + std::to_string(dMR) +
-		"\nmiddle-down: " + std::to_string(dMD) +
-		"\ndown-left: " + std::to_string(dDL) +
-		"\ndown-right: " + std::to_string(dDR) +
-		"\n3D distances:" +
-		"\nleft-right: " + std::to_string(dLR_depth) +
-		"\nmiddle-left: " + std::to_string(dML_depth) +
-		"\nmiddle-right: " + std::to_string(dMR_depth) +
-		"\nmiddle-down: " + std::to_string(dMD_depth) +
-		"\ndown-left: " + std::to_string(dDL_depth) +
-		"\ndown-right: " + std::to_string(dDR_depth) +
+		"\nCoordinates right: " + COORDINATES_TO_STRING((&right_cm));
+	if (NUM_OF_STICKERS == 5) desc += "\nCoordinates mid1: " + COORDINATES_TO_STRING((&mid1_cm));
+	desc += "\nCoordinates mid2: " + COORDINATES_TO_STRING((&mid2_cm)) +
+		"\nCoordinates mid3: " + COORDINATES_TO_STRING((&mid3_cm)) +
+		"\n2D distances:";
+
+	if (NUM_OF_STICKERS == 5)  desc += "\nleft-mid1: " + std::to_string(dLM1);
+	desc += "\nleft-mid2: " + std::to_string(dLM2) +
+		"\nleft-mid3: " + std::to_string(dLM3) +
+		"\nleft-right: " + std::to_string(dLR);
+	if (NUM_OF_STICKERS == 5)  desc += "\nright-mid1: " + std::to_string(dRM1);
+	desc += "\nright-mid2: " + std::to_string(dRM2) +
+		"\nright-mid3: " + std::to_string(dRM3);
+	if (NUM_OF_STICKERS == 5) {
+		desc += "\nmid1-mid2: " + std::to_string(dM1M2) +
+			"\nmid1-mid3: " + std::to_string(dM1M3);
+	}
+	desc += "\nmid2-mid3: " + std::to_string(dM2M3) +
+		"\n3D distances:";
+
+	if (NUM_OF_STICKERS == 5)  desc += "\nleft-mid1: " + std::to_string(dLM1_depth);
+	desc += "\nleft-mid2: " + std::to_string(dLM2_depth) +
+		"\nleft-mid3: " + std::to_string(dLM3_depth) +
+		"\nleft-right: " + std::to_string(dLR_depth);
+	if (NUM_OF_STICKERS == 5)  desc += "\nright-mid1: " + std::to_string(dRM1_depth);
+	desc += "\nright-mid2: " + std::to_string(dRM2_depth) +
+		"\nright-mid3: " + std::to_string(dRM3_depth);
+	if (NUM_OF_STICKERS == 5) {
+		desc += "\nmid1-mid2: " + std::to_string(dM1M2_depth) +
+			"\nmid1-mid3: " + std::to_string(dM1M3_depth);
+	}
+	desc += "\nmid2-mid3: " + std::to_string(dM2M3_depth) +
 		"\n2D average distance: " + std::to_string(average_2d_dist) +
 		"\n3D average distance: " + std::to_string(average_3d_dist) + "\n#################################################\n";
 	return desc;
 }
+
+
+Config::Config(const char* config_filepath) {
+	std::ifstream config_file(config_filepath);
+	std::string line;
+	//get mode
+	std::getline(config_file, line); //first line is a comment
+	std::getline(config_file, line);
+	
+	if (line.compare("D") == 0) {
+		Config::mode = graph_mode::DISTANCES;
+		std::getline(config_file, line); // new line
+		std::getline(config_file, line); // comment
+		// get distances to include
+		for (int distInt = distances::left_mid1; distInt != distances::ddummy; distInt++) {
+			distances d = static_cast<distances>(distInt);
+			std::getline(config_file, line);
+			//std::string k = line.substr(0, line.find(" "));
+			std::string val = line.substr(line.length() - 1, line.length());
+			Config::dists_included[d] = (val.compare("y") == 0) ? true : false;
+		}
+	}
+	else {
+		Config::mode = graph_mode::LOCATION;
+		std::getline(config_file, line); // new line
+		std::getline(config_file, line); // comment
+		//skip distances
+		getline(config_file, line);
+		while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
+		// get included stickers
+		for (int stInt = stickers::left; stInt != stickers::sdummy; stInt++) {
+			stickers s = static_cast<stickers>(stInt);
+			std::getline(config_file, line);
+			std::string val = line.substr(line.length() - 1, line.length());
+			Config::stickers_included[s] = (val.compare("y") == 0) ? true : false;
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
 
 void save_last_frame(const char* filename, const rs2::video_frame& frame) {
 	static int frame_index = 0;

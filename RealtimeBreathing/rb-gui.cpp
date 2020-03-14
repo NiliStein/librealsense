@@ -33,6 +33,7 @@ namespace rs2
 
 int main(int argc, char * argv[]) try
 {
+
 	window app(1280, 720, "RealtimeBreathing");
 
 	//ImGui::CreateContext();
