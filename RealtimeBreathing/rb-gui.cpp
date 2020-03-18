@@ -33,7 +33,6 @@ namespace rs2
 
 int main(int argc, char * argv[]) try
 {
-
 	window app(1280, 720, "RealtimeBreathing");
 
 	//ImGui::CreateContext();
@@ -66,7 +65,6 @@ int main(int argc, char * argv[]) try
 
 	while (app) // application still alive?
 	{
-
 		// Flags for displaying ImGui window
 		static const int flags = ImGuiWindowFlags_NoCollapse
 			| ImGuiWindowFlags_NoSavedSettings
@@ -75,7 +73,6 @@ int main(int argc, char * argv[]) try
 
 		// render the ui:
 		ImGui_ImplGlfw_NewFrame(1);
-		//ImGui::NewFrame();
 
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
@@ -122,6 +119,7 @@ int main(int argc, char * argv[]) try
 					recording = true;
 				
 				}
+
 				if (recording) {
 					if (ImGui::Button("stop\nrecord", { 50, 50 }))
 					{
@@ -132,10 +130,8 @@ int main(int argc, char * argv[]) try
 						recording = false;
 					}
 				}
-				
-				
-
 			}
+
 			if (!show_camera_stream && run_on_existing_file) {
 				if (stream_enabled) {
 					/*
@@ -151,9 +147,9 @@ int main(int argc, char * argv[]) try
 					filename = rs2::file_dialog_open(rs2::file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL);
 					cfg.enable_device_from_file(filename);
 					pipe.start(cfg); //File will be opened in read mode at this point
-
 				}
 			}
+
 			if (!show_camera_stream && !run_on_existing_file) {
 				if (filename) {
 					/*
@@ -175,6 +171,7 @@ int main(int argc, char * argv[]) try
 					pipe.stop();
 					stream_enabled = false;
 				}
+
 				ImGui::End();
 				ImGui::Render();
 				continue;
@@ -186,43 +183,30 @@ int main(int argc, char * argv[]) try
 				continue;
 			}
 
-
 			// using the align object, we block the application until a frameset is available
 			rs2::frameset fs = pipe.wait_for_frames();
-			rs2::frameset frameset_depth(fs);
-			rs2::frameset frameset_color(fs);
+		/*	rs2::frameset frameset_depth(fs);
+			rs2::frameset frameset_color(fs);*/
 
 			// align all frames to depth viewport
-			frameset_depth = align_to_depth.process(frameset_depth);
+			//fs = align_to_depth.process(fs);
 
 			// align all frames to color viewport
-			frameset_color = align_to_color.process(frameset_color);
+			fs = align_to_color.process(fs);
 
 			// with the aligned frameset we proceed as usual
-			auto depth = frameset_depth.get_depth_frame();
-			auto color = frameset_color.get_color_frame();
+			auto depth = fs.get_depth_frame();
+			auto color = fs.get_color_frame();
 			auto colorized_depth = colorizer.colorize(depth);
 			
 			//collect all frames:
 			//using a map as in rs-multicam to allow future changes in number of cameras displayed.
 			std::map<int, rs2::frame> render_frames;
 
-			//for (const rs2::frame& f : frameset_color) {
-			//	
-			//	//save_last_frame("frames\\frame", f);
-			//	// TODO: Currently, the format of the frame data is only RS2_FORMAT_RGB8, RS2_FORMAT_BGR8 causes exception....
-			//	const void * color_frame_data = f.get_data();
-			//	cv::Mat rgb8_mat(cv::Size(color_frame_width, color_frame_height), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
-			//	cv::Mat bgr8_mat(cv::Size(color_frame_width, color_frame_height), CV_8UC3);
-			//	cv::cvtColor(rgb8_mat, bgr8_mat, cv::COLOR_RGB2BGR);
-			//	//new_frames.emplace_back(f);
-			//}
-
 			frame_manager.process_frame(color, depth);
-			
 
 			// convert the newly-arrived frames to render-firendly format
-			//for (const auto& frame : fs) //iterate over all available frames. removed to ignore IR emmitter frames.
+			//for (const auto& frame : fs) //iterate over all available frames. removed to ignore IR emitter frames.
 			//{
 				render_frames[color.get_profile().unique_id()] = colorizer.process(color);
 				render_frames[depth.get_profile().unique_id()] = colorizer.process(depth);
@@ -231,45 +215,11 @@ int main(int argc, char * argv[]) try
 			// present all the collected frames with opengl mosaic
 			app.show(render_frames);
 
-
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);
-#if 0			 
-			//todo: fix distance presentation
-			//show the distance of the image from the camera:
-			// try to get a frame of a depth image
-			rs2::depth_frame depth_frame = frameset_depth.get_depth_frame();
-
-			// get the depth frame's dimensions
-			float depth_frame_width = depth_frame.get_width();
-			float depth_frame_height = depth_frame.get_height();
-
-			// query the distance from the camera to the object in the center of the image
-			float dist_to_center = depth.get_distance(depth_frame_width / 2, depth_frame_height / 2);
-
-			//show the distance in a dialog box:
-			bool open = true;
-			if (ImGui::BeginPopupModal("distance from camera", &open))
-			{
-				//the following function uses printf() format string:
-				ImGui::TextWrapped("distance from camera is: %f", dist_to_center);
-			}
-#endif
-			//ImGui::End();
-
-		//} else { //stop camera:
-		//	if (stream_enabled) {
-		//		cfg.disable_stream(RS2_STREAM_DEPTH);
-		//		cfg.disable_stream(RS2_STREAM_COLOR);
-		//		pipe.stop();
-		//		stream_enabled = false;
-		//	}
-		//	ImGui::Render();
-		//	continue;
-		//}
 		
-		ImGui::End();
-		ImGui::Render();
+			ImGui::End();
+			ImGui::Render();
 	}
 
 	return EXIT_SUCCESS;

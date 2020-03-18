@@ -15,11 +15,11 @@
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
 #define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
 #define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
-#define NUM_OF_STICKERS 5
+#define NUM_OF_STICKERS 4
 #define CALC_2D_BY_CM true //if false, calculate by pixels
 
 //TODO: for logging
-std::ofstream logFile("frames\\log.txt");
+std::ofstream logFile("log.txt");
 
 
 static float distance2D(float x, float y, float a, float b) {
@@ -42,6 +42,8 @@ void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, c
 	output[1] = float(point[1]) * 100.0;
 	output[2] = float(point[2]) * 100.0;
 }
+
+/* Compare functions to sort the stickers: */
 
 static struct compareCirclesByY {
 	//returns true if c2's y is greater than c1's y.
@@ -114,7 +116,6 @@ FrameManager::~FrameManager()
 
 void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame)
 {
-
 	// Create bgr mode matrix of color_frame
 	const void * color_frame_data = color_frame.get_data();
 	cv::Mat rgb8_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, (void *)color_frame_data, cv::Mat::AUTO_STEP);
@@ -126,7 +127,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//find yellows:
 	cv::Mat yellow_only_mask(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC1);
 	//hsv official yellow range: (20, 100, 100) to (30, 255, 255)
-	inRange(hsv8_mat, cv::Scalar(20, 50, 50), cv::Scalar(40, 255, 255), yellow_only_mask); //yellow bgr range
+	inRange(hsv8_mat, cv::Scalar(20, 50, 50), cv::Scalar(40, 255, 255), yellow_only_mask); //yellow hsv range
 	cv::Mat yellow_only_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, cv::Scalar(0, 0, 0));
 	hsv8_mat.copyTo(yellow_only_mat, yellow_only_mask);
 
@@ -139,15 +140,10 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	cvtColor(yellow_only_mat, yellow_only_bgr8_mat, cv::COLOR_HSV2BGR);
 	cv::Mat yellow_only_grayscale_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
 	cvtColor(yellow_only_bgr8_mat, yellow_only_grayscale_mat, cv::COLOR_BGR2GRAY);
-
-	cv::imwrite("frames\\yellow_grayscale.jpg", yellow_only_grayscale_mat);
-
-	//find circles:
-	//Reduce the noise so we avoid false circle detection
-	//GaussianBlur(yellow_only_grayscale_mat, yellow_only_grayscale_mat, cv::Size(9, 9), 2, 2);
 	
-	//cv::imwrite("frames\\yellow_grayscale_gaussian.jpg", yellow_only_grayscale_mat);
-
+	// TODO: For Debug only, remove when finished
+	cv::imwrite("frames\\yellow_grayscale.jpg", yellow_only_grayscale_mat);
+	
 	//create binary image:
 	cv::Mat image_th;
 	cv::Mat bin_mat(yellow_only_grayscale_mat.size(), yellow_only_grayscale_mat.type());
@@ -177,7 +173,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	}
 	area_threshold = area_threshold / 2;
 
-
 	//get centers:
 	for (int i = 1; i < centroids.rows; i++) //label 0 is the background
 	{
@@ -185,10 +180,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 			breathing_data->circles.push_back(cv::Vec3f(centroids(i, 0), centroids(i, 1)));
 			circle(rgb8_mat, cv::Point(centroids(i, 0), centroids(i, 1)), 3, cv::Scalar(0, 255, 0));
 		}
-		
-		
 	}
-
 
 	//distinguish between stickers:
 	if (breathing_data->circles.size() < NUM_OF_STICKERS) {//not all circles were found
@@ -205,7 +197,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	}
 	get_3d_coordinates(depth_frame, float((*breathing_data->mid2)[0]), (*breathing_data->mid2)[1], breathing_data->mid2_cm);
 	get_3d_coordinates(depth_frame, float((*breathing_data->mid3)[0]), (*breathing_data->mid3)[1], breathing_data->mid3_cm);
-
 
 	//calculate 2D distances:
 	breathing_data->CalculateDistances2D();
@@ -224,7 +215,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	middle_ref[2] = depth_frame.get_distance(middle_ref[0], middle_ref[1]);
 	down_ref[2] = depth_frame.get_distance(down_ref[0], down_ref[1]);
 	*/
-
 
 	//calculate 3D distances:
 	breathing_data->CalculateDistances3D();
@@ -301,8 +291,6 @@ void BreathingFrameData::CalculateDistances2D()
 	if (NUM_OF_STICKERS == 5 && !mid1) return;
 
 	if (CALC_2D_BY_CM) {
-
-		
 		dLM2 = CALC_2D_DIST((&left_cm), (&mid2_cm));
 		dLM3 = CALC_2D_DIST((&left_cm), (&mid3_cm));
 		dLR = CALC_2D_DIST((&left_cm), (&right_cm));
@@ -348,21 +336,19 @@ void BreathingFrameData::CalculateDistances3D()
 	if (!left || !right || !mid2 || !mid3) return;
 	if (NUM_OF_STICKERS == 5 && !mid1) return;
 
-
-	
 	dLM2_depth = CALC_3D_DIST(left_cm, mid2_cm); 
 	dLM3_depth = CALC_3D_DIST(left_cm, mid3_cm); 
 	dLR_depth = CALC_3D_DIST(left_cm, right_cm); 
 	dRM2_depth = CALC_3D_DIST(right_cm, mid2_cm);
 	dRM3_depth = CALC_3D_DIST(right_cm, mid3_cm);
 	dM2M3_depth = CALC_3D_DIST(mid2_cm, mid3_cm);
+
 	if (NUM_OF_STICKERS == 5) {		//sticker mid1 exists
 		dLM1_depth = CALC_3D_DIST(left_cm, mid1_cm);
 		dRM1_depth = CALC_3D_DIST(right_cm, mid1_cm);
 		dM1M2_depth = CALC_3D_DIST(mid1_cm, mid2_cm);
 		dM1M3_depth = CALC_3D_DIST(mid1_cm, mid3_cm);
 	}
-
 
 	//calculate average:
 	if (NUM_OF_STICKERS == 5) {
@@ -371,7 +357,6 @@ void BreathingFrameData::CalculateDistances3D()
 	else {
 		average_3d_dist = (dLM2_depth + dLM3_depth + dLR_depth + dRM2_depth + dRM3_depth + dM2M3_depth) / 6;
 	}
-	
 
 }
 
@@ -463,37 +448,37 @@ Config::Config(const char* config_filepath) {
 
 
 
+/* OLD FUNCTIONS: */
 
-
-void save_last_frame(const char* filename, const rs2::video_frame& frame) {
-	static int frame_index = 0;
-	static int frame_counter = 0;
-	static std::string frame_filenames[NUM_OF_LAST_FRAMES] = { "" };
-
-	std::string stream_desc{};
-	std::string filename_base(filename);
-
-	stream_desc = rs2_stream_to_string(frame.get_profile().stream_type());
-	auto t = std::time(nullptr);
-	auto tm = *std::localtime(&t);
-	std::ostringstream oss;
-	oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
-
-	auto filename_png = filename_base + "_" + stream_desc + oss.str() + std::to_string(frame_counter) + ".png";
-
-	// delete oldest frame file 
-	if (frame_filenames[frame_index] != "") {
-		const int result = remove(frame_filenames[frame_index].c_str());
-		if (result != 0) {
-			printf("remove(%s) failed. Error: %s\n", frame_filenames[frame_index].c_str(), strerror(errno)); // No such file or directory
-			// TODO: throw exception
-		}
-	}
-
-	rs2::save_to_png(filename_png.data(), frame.get_width(), frame.get_height(), frame.get_bytes_per_pixel(),
-		frame.get_data(), frame.get_width() * frame.get_bytes_per_pixel());
-
-	frame_filenames[frame_index] = filename_png;
-	frame_index = (frame_index + 1) % NUM_OF_LAST_FRAMES;
-	frame_counter++;
-}
+//void save_last_frame(const char* filename, const rs2::video_frame& frame) {
+//	static int frame_index = 0;
+//	static int frame_counter = 0;
+//	static std::string frame_filenames[NUM_OF_LAST_FRAMES] = { "" };
+//
+//	std::string stream_desc{};
+//	std::string filename_base(filename);
+//
+//	stream_desc = rs2_stream_to_string(frame.get_profile().stream_type());
+//	auto t = std::time(nullptr);
+//	auto tm = *std::localtime(&t);
+//	std::ostringstream oss;
+//	oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+//
+//	auto filename_png = filename_base + "_" + stream_desc + oss.str() + std::to_string(frame_counter) + ".png";
+//
+//	// delete oldest frame file 
+//	if (frame_filenames[frame_index] != "") {
+//		const int result = remove(frame_filenames[frame_index].c_str());
+//		if (result != 0) {
+//			printf("remove(%s) failed. Error: %s\n", frame_filenames[frame_index].c_str(), strerror(errno)); // No such file or directory
+//			// TODO: throw exception
+//		}
+//	}
+//
+//	rs2::save_to_png(filename_png.data(), frame.get_width(), frame.get_height(), frame.get_bytes_per_pixel(),
+//		frame.get_data(), frame.get_width() * frame.get_bytes_per_pixel());
+//
+//	frame_filenames[frame_index] = filename_png;
+//	frame_index = (frame_index + 1) % NUM_OF_LAST_FRAMES;
+//	frame_counter++;
+//}

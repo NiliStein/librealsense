@@ -3,16 +3,17 @@
 #include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
 
-#define NUM_OF_LAST_FRAMES 10
+#define NUM_OF_LAST_FRAMES 150 //max number of 15 seconds under 30 fps
 #define CONFIG_FILEPATH "config.txt"
 
-
-void save_last_frame(const char* filename, const rs2::video_frame& frame);
+// OLD:
+//void save_last_frame(const char* filename, const rs2::video_frame& frame);
 
 enum graph_mode {
 	DISTANCES,
 	LOCATION
 };
+
 enum stickers {
 	left,
 	mid1,
@@ -21,6 +22,7 @@ enum stickers {
 	right,
 	sdummy // needed for enum iteration
 };
+
 enum distances {
 	left_mid1,
 	left_mid2,
@@ -56,7 +58,24 @@ public:
 	Config(const char* config_filepath);
 };
 
-
+/*	BreathingFrameData class
+	Stores the processed data of a frame.
+	@ circles : saves the centroids of the circles found representing the stickers.
+		Each circle has x,y coordinates and depth, indexes of each are in the corresponding order.
+		First circle is the frame center.
+	@ left, right, mid1-3 : Pointers to the coordinates of the corresponding sticker, as following:
+		left ---- mid1 ---- right
+		  -					 -
+		    -	  mid2	   -
+			  -			 -
+			    - mid3 -
+		Values can be invalid if stickers do not exist. Careful!
+	@ ***_cm : coordinates in cm.
+	@ dAB : distance in pixels between A and B, while A,B are initials of the names of the stickers.
+	@ dAB_depth : 3D distance in cm between A and B, while A,B are initials of the names of the stickers.
+	@ average_2d_dist, average_3d_dist : average distances between stickers, in 2D and in 3D.
+	@ ***_timestamp : timestamp of each frame.
+*/
 class BreathingFrameData {
 public:
 	std::vector<cv::Vec3f> circles; //(x,y,depth)
@@ -85,12 +104,23 @@ public:
 
 	//METHODS://
 
+	/* Updates the locations of the stickers and validates the pointers to them. */
 	void UpdateStickersLoactions();
+
+	/* Calculates 2D distances between all stickers and their average. */
 	void CalculateDistances2D();
+	/* Calculates 3D distances between all stickers and their average. */
 	void CalculateDistances3D();
+
+	/* Gets the description of the frame in the following format:
+		TODO: update format */
 	std::string GetDescription();
 };
 
+
+/* FrameManager class.
+	Manages all frames and the memory required for them.
+*/
 class FrameManager {
 public:
 	//ctor
