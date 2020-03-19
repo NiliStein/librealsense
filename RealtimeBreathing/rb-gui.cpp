@@ -8,6 +8,7 @@
 #include <iostream>
 #include "rb_aux.h"
 #include <opencv2/opencv.hpp>
+#include <chrono>
 
 // copied os.h because project does comile when including it (seems to be due to double inclusion of rendering.h)
 // *****	START of os.h copy	*****
@@ -63,6 +64,8 @@ int main(int argc, char * argv[]) try
 	bool run_on_existing_file = false; //When true, run analysis for an existing file chosen by user through open_dialog
 	bool recording = false; //When true, record camera stream to file
 
+	clock_t start_time, end_time; //measure time, for 15 seconds intervals
+
 	while (app) // application still alive?
 	{
 		// Flags for displaying ImGui window
@@ -108,6 +111,7 @@ int main(int argc, char * argv[]) try
 					cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
 					pipe.start(cfg);
 					stream_enabled = true;
+					start_time = clock();
 				}
 
 				if (ImGui::Button("record", { 50, 50 }))
@@ -117,7 +121,6 @@ int main(int argc, char * argv[]) try
 					cfg.enable_record_to_file(out_filename);
 					pipe.start(cfg); //File will be opened at this point
 					recording = true;
-				
 				}
 
 				if (recording) {
@@ -146,6 +149,7 @@ int main(int argc, char * argv[]) try
 				if (!filename) {
 					filename = rs2::file_dialog_open(rs2::file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL);
 					cfg.enable_device_from_file(filename);
+					start_time = clock();
 					pipe.start(cfg); //File will be opened in read mode at this point
 				}
 			}
@@ -214,6 +218,13 @@ int main(int argc, char * argv[]) try
 
 			// present all the collected frames with opengl mosaic
 			app.show(render_frames);
+
+			end_time = clock();
+			//set interval of 15 seconds:
+			if (double(end_time - start_time) / double(CLOCKS_PER_SEC) >= 15.0) {
+				frame_manager.activateInterval(); //activate calculation since we have 15 seconds at least
+			}
+
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);

@@ -98,8 +98,9 @@ static struct compareCirclesByX {
 //}
 
 FrameManager::FrameManager(unsigned int n_frames, const char * frame_disk_path) :
-	_n_frames(n_frames), _frame_disk_path(frame_disk_path), _oldest_frame_index(0), user_cfg(Config(CONFIG_FILEPATH))
+	_n_frames(n_frames), _frame_disk_path(frame_disk_path), _oldest_frame_index(0), user_cfg(Config(CONFIG_FILEPATH)), interval_active(false)
 {
+	manager_start_time = clock();
 	_frame_data_arr = new BreathingFrameData*[_n_frames];
 	for (unsigned int i = 0; i < _n_frames; i++) {
 		_frame_data_arr[i] = NULL;
@@ -132,7 +133,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	hsv8_mat.copyTo(yellow_only_mat, yellow_only_mask);
 
 	// TODO: For Debug only, remove when finished
-	cv::imwrite("frames\\only_yellow.jpg", yellow_only_mat);
+	//cv::imwrite("frames\\only_yellow.jpg", yellow_only_mat);
 
 
 	//Pick up the grayscale
@@ -142,7 +143,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	cvtColor(yellow_only_bgr8_mat, yellow_only_grayscale_mat, cv::COLOR_BGR2GRAY);
 	
 	// TODO: For Debug only, remove when finished
-	cv::imwrite("frames\\yellow_grayscale.jpg", yellow_only_grayscale_mat);
+	//cv::imwrite("frames\\yellow_grayscale.jpg", yellow_only_grayscale_mat);
 	
 	//create binary image:
 	cv::Mat image_th;
@@ -154,7 +155,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//cv::adaptiveThreshold(yellow_only_grayscale_mat, image_th, 255,
 	//	cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY_INV, 3, 5);
 	
-	cv::imwrite("frames\\yellow_grayscale_gaussian.jpg", image_th);
+	//cv::imwrite("frames\\yellow_grayscale_gaussian.jpg", image_th);
 
 	//connected components:
 	cv::Mat1i labels;
@@ -185,6 +186,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//distinguish between stickers:
 	if (breathing_data->circles.size() < NUM_OF_STICKERS) {//not all circles were found
 		cleanup();
+		interval_active = false; //missed frame so calculation has to start all over.
 		return;
 	}
 	breathing_data->UpdateStickersLoactions();
@@ -222,8 +224,19 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//add depth timestamp:
 	breathing_data->depth_timestamp = depth_frame.get_timestamp();
 
+	//add system timestamp:
+	clock_t current_system_time = clock();
+	breathing_data->system_timestamp = (current_system_time - manager_start_time) / double(CLOCKS_PER_SEC); //time in seconds elapsed since frame manager created
+
 	//TODO: for logging
 	logFile << breathing_data->GetDescription();
+
+	//TODO: for debugging:
+	if (this->interval_active) {
+		std::string interval_text = "\n------------------- start interval ---------------------\n";
+		logFile << interval_text;
+	}
+
 	logFile << user_cfg.mode;
 	
 	add_frame_data(breathing_data);
@@ -252,6 +265,14 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 
 	_frame_data_arr[_oldest_frame_index] = frame_data;
 	_oldest_frame_index = (_oldest_frame_index + 1) % _n_frames;
+}
+
+void FrameManager::activateInterval() {
+	this->interval_active = true;
+}
+
+void FrameManager::deactivateInterval() {
+	this->interval_active = false;
 }
 
 void BreathingFrameData::UpdateStickersLoactions()
@@ -364,6 +385,7 @@ std::string BreathingFrameData::GetDescription()
 {
 	std::string desc = "Color timestamp: " + std::to_string(color_timestamp) +
 		"\nDepth timestamp: " + std::to_string(depth_timestamp) +
+		"\nSystem timestamp: " + std::to_string(system_timestamp) +
 		"\nCoordinates left: " + COORDINATES_TO_STRING((&left_cm)) +
 		"\nCoordinates right: " + COORDINATES_TO_STRING((&right_cm));
 	if (NUM_OF_STICKERS == 5) desc += "\nCoordinates mid1: " + COORDINATES_TO_STRING((&mid1_cm));

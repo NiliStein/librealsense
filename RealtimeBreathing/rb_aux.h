@@ -90,6 +90,7 @@ public:
 	float average_3d_dist;
 	double color_timestamp;
 	double depth_timestamp;
+	double system_timestamp;
 
 	//ctor:
 	BreathingFrameData() :
@@ -137,6 +138,10 @@ public:
 	 */
 	void process_frame(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame);
 
+	/* Turn interval activity on/off: */
+	void activateInterval();
+	void deactivateInterval();
+
 private:
 	/**
 	 * Cleans all allocated resources
@@ -154,4 +159,6 @@ private:
 	unsigned int _oldest_frame_index;
 	BreathingFrameData** _frame_data_arr;
 	const char* _frame_disk_path;
+	bool interval_active;
+	clock_t manager_start_time;
 };
