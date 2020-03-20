@@ -231,13 +231,28 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//TODO: for logging
 	logFile << breathing_data->GetDescription();
 
+	/* for debugging
+	
+	std::vector<float> out_loc;
+	std::vector<double> out_time;
+	get_locations(stickers::left, &out_time, &out_loc);
+	for (int i = 0; i < out_time.size(); i++) {
+		logFile << out_time.at(i) << ' ' << std::to_string(out_loc.at(i)) << '\n';
+	}
+	
+
+	std::vector<float> out_dists;
+	std::vector<double> out_time;
+	get_dists(&out_time, &out_dists);
+	for (int i = 0; i < out_time.size(); i++) {
+		logFile << out_time.at(i) << ' ' << std::to_string(out_dists.at(i)) << '\n';
+	}
+	*/
 	//TODO: for debugging:
 	if (this->interval_active) {
 		std::string interval_text = "\n------------------- start interval ---------------------\n";
 		logFile << interval_text;
 	}
-
-	logFile << user_cfg.mode;
 	
 	add_frame_data(breathing_data);
 }
@@ -265,6 +280,49 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 
 	_frame_data_arr[_oldest_frame_index] = frame_data;
 	_oldest_frame_index = (_oldest_frame_index + 1) % _n_frames;
+}
+
+void FrameManager::get_locations(stickers s, std::vector<double> *out_timestamps, std::vector<float> *out_loc) {
+	//TODO: check if order matters. if it does, iterate frames array according to time of arrival
+	if (_frame_data_arr != NULL) {
+		double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
+		for (unsigned int i = 0; i < _n_frames; i++) {
+			if (_frame_data_arr[i] != NULL) {
+				//check if frame was received in under 15 sec
+				if ((current_time - _frame_data_arr[i]->system_timestamp) <= 15.0) {
+					out_timestamps->push_back(_frame_data_arr[i]->system_timestamp);
+					out_loc->push_back((*_frame_data_arr[i]->stickers_map_cm[s])[2]);
+				}
+			}
+		}
+	}
+}
+
+void FrameManager::get_dists(std::vector<double> *out_timestamps, std::vector<float> *out_dists) {
+	//TODO: check if order matters. if it does, iterate frames array according to time of arrival
+	if (_frame_data_arr != NULL) {
+		double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
+		for (unsigned int i = 0; i < _n_frames; i++) {
+			if (_frame_data_arr[i] != NULL) {
+				//check if frame was received in under 15 sec
+				if ((current_time - _frame_data_arr[i]->system_timestamp) <= 15.0) {
+					out_timestamps->push_back(_frame_data_arr[i]->system_timestamp);
+					float avg_dist = 0.0;
+					int c = 0;
+					for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
+						distances dist = dist_elem.first;
+						bool is_included = dist_elem.second;
+						if (is_included) { //if distance is included in user_cfg
+							avg_dist += *(_frame_data_arr[i]->distances_map_depth[dist]);
+							c += 1;
+						}
+					}
+					avg_dist = avg_dist / (c*1.0);
+					out_dists->push_back(avg_dist);
+				}
+			}
+		}
+	}
 }
 
 void FrameManager::activateInterval() {

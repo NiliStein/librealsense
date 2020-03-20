@@ -82,9 +82,11 @@ public:
 	cv::Vec3f *left, *right, *mid1, *mid2, *mid3; //(x,y,depth)
 	//TODO: adding alternative coordinates in cm, choose one after deciding which is more accurate (dist by pixels or by cm(given by rs2_deproject))
 	cv::Vec3f left_cm, right_cm, mid1_cm, mid2_cm, mid3_cm; //(x,y,depth)
+	std::map<stickers, cv::Vec3f*> stickers_map_cm;
 	float dLM1, dLM2, dLM3, dLR, dRM1, dRM2, dRM3, dM1M2, dM1M3, dM2M3;
 	//float dLR, dML, dMR, dMD, dDL, dDR;
 	float dLM1_depth, dLM2_depth, dLM3_depth, dLR_depth, dRM1_depth, dRM2_depth, dRM3_depth, dM1M2_depth, dM1M3_depth, dM2M3_depth;
+	std::map<distances, float*> distances_map_depth;
 	//float dLR_depth, dML_depth, dMR_depth, dMD_depth, dDL_depth, dDR_depth;
 	float average_2d_dist;
 	float average_3d_dist;
@@ -95,9 +97,13 @@ public:
 	//ctor:
 	BreathingFrameData() :
 		left(NULL), right(NULL), mid1(NULL), mid2(NULL), mid3(NULL),
+		stickers_map_cm({ {stickers::left, &left_cm}, {stickers::mid1, &mid1_cm}, {stickers::mid2, &mid2_cm}, {stickers::mid3, &mid3_cm}, {stickers::right, &right_cm} }),
 		dLM1(0.0), dLM2(0.0), dLM3(0.0), dLR(0.0), dRM1(0.0), dRM2(0.0), dRM3(0.0), dM1M2(0.0), dM1M3(0.0), dM2M3(0.0),
 		//dLR(0.0), dML(0.0), dMR(0.0), dMD(0.0), dDL(0.0), dDR(0.0),
 		dLM1_depth(0.0), dLM2_depth(0.0), dLM3_depth(0.0), dLR_depth(0.0), dRM1_depth(0.0), dRM2_depth(0.0), dRM3_depth(0.0), dM1M2_depth(0.0), dM1M3_depth(0.0), dM2M3_depth(0.0),
+		distances_map_depth({ {distances::left_mid1, &dLM1_depth}, {distances::left_mid2, &dLM2_depth}, {distances::left_mid3, &dLM3_depth}, {distances::left_right, &dLR_depth},
+			{distances::right_mid1, &dRM1_depth}, {distances::right_mid2, &dRM2_depth}, {distances::right_mid3, &dRM3_depth}, {distances::mid1_mid2, &dM1M2_depth}, 
+			{distances::mid1_mid3, &dM1M3_depth}, {distances::mid2_mid3, &dM2M3_depth} }),
 		//dLR_depth(0.0), dML_depth(0.0), dMR_depth(0.0), dMD_depth(0.0), dDL_depth(0.0), dDR_depth(0.0),
 		average_2d_dist(0.0), average_3d_dist(0.0),
 		color_timestamp(0.0), depth_timestamp(0.0)
@@ -153,6 +159,20 @@ private:
 	 * NOTE: only last n_frames saved so the oldest frame_data will be deleted 
 	 */
 	void add_frame_data(BreathingFrameData * frame_data);
+
+	/**
+	* To be used in L mode (for plotting locations of stickers)
+	* TODO: for now, return only z coordinate (depth)
+	* returns system_timestamp and according depth of sticker s for every frame  received in the last 15 seconds
+	*/
+	void get_locations(stickers s, std::vector<double> *out_timestamps, std::vector<float> *out_loc);
+	
+	/**
+	* To be used in D mode (for plotting avg distance of stickers)
+	* returns system_timestamp and according avg distance of every frame  received in the last 15 seconds
+	* the avg distance is calculates only for distances set to true in config::dists_included
+	*/
+	void get_dists(std::vector<double> *out_timestamps, std::vector<float> *out_dists);
 
 	Config user_cfg;
 	unsigned int _n_frames;
