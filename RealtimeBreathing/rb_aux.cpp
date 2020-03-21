@@ -17,10 +17,20 @@
 #define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define NUM_OF_STICKERS 4
 #define CALC_2D_BY_CM true //if false, calculate by pixels
+#define PI 3.14159265358979323846
 
 //TODO: for logging
 std::ofstream logFile("log.txt");
 
+// fill out with n values, evely spaced (hopefully) between a and b, including a and b
+void linespace(double a, double b, int n, std::vector<double>* out) {
+	double step = (b - a) / (n - 1);
+	for(int i = 0; i < n - 1; i++) {
+		out->push_back(a);
+		a += step;           // could recode to better handle rounding errors
+	}
+	out->push_back(b);
+}
 
 static float distance2D(float x, float y, float a, float b) {
 	return sqrt(pow(x - a, 2) + pow(y - b, 2));
@@ -255,6 +265,12 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	}
 	
 	add_frame_data(breathing_data);
+	std::vector<float> out_dists;
+	std::vector<double> out_time;
+	get_dists(&out_time, &out_dists);
+
+	float f = get_frequency(out_dists, out_time);
+	logFile << "Frequency: " << std::to_string(f) << ' ' << "BPM: " << 60.0*f << '\n';
 }
 
 void FrameManager::cleanup()
@@ -287,11 +303,12 @@ void FrameManager::get_locations(stickers s, std::vector<double> *out_timestamps
 	if (_frame_data_arr != NULL) {
 		double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
 		for (unsigned int i = 0; i < _n_frames; i++) {
-			if (_frame_data_arr[i] != NULL) {
+			int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN then get_locations is run after add_frame_data (after _oldest_frame_idx++)
+			if (_frame_data_arr[idx] != NULL) {
 				//check if frame was received in under 15 sec
-				if ((current_time - _frame_data_arr[i]->system_timestamp) <= 15.0) {
-					out_timestamps->push_back(_frame_data_arr[i]->system_timestamp);
-					out_loc->push_back((*_frame_data_arr[i]->stickers_map_cm[s])[2]);
+				if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) {
+					out_timestamps->push_back(_frame_data_arr[idx]->system_timestamp);
+					out_loc->push_back((*_frame_data_arr[idx]->stickers_map_cm[s])[2]);
 				}
 			}
 		}
@@ -303,17 +320,18 @@ void FrameManager::get_dists(std::vector<double> *out_timestamps, std::vector<fl
 	if (_frame_data_arr != NULL) {
 		double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
 		for (unsigned int i = 0; i < _n_frames; i++) {
-			if (_frame_data_arr[i] != NULL) {
+			int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN then get_dists is run after add_frame_data (after _oldest_frame_idx++)
+			if (_frame_data_arr[idx] != NULL) {
 				//check if frame was received in under 15 sec
-				if ((current_time - _frame_data_arr[i]->system_timestamp) <= 15.0) {
-					out_timestamps->push_back(_frame_data_arr[i]->system_timestamp);
+				if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) {
+					out_timestamps->push_back(_frame_data_arr[idx]->system_timestamp);
 					float avg_dist = 0.0;
 					int c = 0;
 					for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
 						distances dist = dist_elem.first;
 						bool is_included = dist_elem.second;
 						if (is_included) { //if distance is included in user_cfg
-							avg_dist += *(_frame_data_arr[i]->distances_map_depth[dist]);
+							avg_dist += *(_frame_data_arr[idx]->distances_map_depth[dist]);
 							c += 1;
 						}
 					}
@@ -324,6 +342,60 @@ void FrameManager::get_dists(std::vector<double> *out_timestamps, std::vector<fl
 		}
 	}
 }
+// assuming dists and time are ordered according to time (oldest fisrt)
+// dists and time are of the same size
+float FrameManager::get_frequency(std::vector<float> &dists, std::vector<double> &systime) {
+	
+	int N = dists.size();	// N - number of samples (frames)
+	
+	double t0 = systime[0];	// t0, t1 - start, end time(seconds)
+	double t1 = systime[N-1];
+	
+	int fps = N / (t1 - t0);	// FPS - frames per second
+	// t - vector of time signatures
+		// note: t = [t0    t0+(t1-t0/win_size-1)    t0+(t1-t0/win_size-1)*2    t0+(t1-t0/win_size-1)*3 ...... t1];
+	//std::vector<double> t;
+	//linespace(t0, t1, N, &t);
+
+	/*
+	// vector of frequency signatures
+	// note: frequency is  a vector of(N / 2) evenly spaced points between 0 and FPS / 2.
+	std::vector<double> frequencies;
+	linespace(0, fps / 2, N / 2, &frequencies);
+	*/
+	std::vector<double> coef;
+	float C = 2 * PI / N;
+
+
+	int max_idx = 0;
+	double max_val = 0;
+	//calculate real part of coefficients
+	coef.push_back(0.0);	// //frequency 0 always most dominant. ignore first coef.
+	for (int k = 1; k <= N / 2; k++) {
+		coef.push_back(0.0);
+		for (int n = 0; n < N; n++) {
+			coef[k] += dists[n] * cos(C*k*n);
+		}
+		if (abs(coef[k]) > max_val) {
+			max_val = abs(coef[k]);
+			max_idx = k;
+		}
+	}
+	
+	/*
+	//get absolute value of first N/2 coefficients (only the real part)
+	
+	for (int i = 1; i < N / 2; i++) { //frequency 0 always ,ost dominant. ignore first coef.
+		if (abs(coef[i]) > max_val) {
+			max_val = abs(coef[i]);
+			max_idx = i;
+		}
+	}
+	*/
+	float f = fps / (N - 2.0) * max_idx;
+	return f;
+}
+
 
 void FrameManager::activateInterval() {
 	this->interval_active = true;

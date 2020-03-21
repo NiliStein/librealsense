@@ -3,7 +3,7 @@
 #include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
 
-#define NUM_OF_LAST_FRAMES 150 //max number of 15 seconds under 30 fps
+#define NUM_OF_LAST_FRAMES 450 //max number of 15 seconds under 30 fps
 #define CONFIG_FILEPATH "config.txt"
 
 // OLD:
@@ -163,17 +163,23 @@ private:
 	/**
 	* To be used in L mode (for plotting locations of stickers)
 	* TODO: for now, return only z coordinate (depth)
-	* returns system_timestamp and according depth of sticker s for every frame  received in the last 15 seconds
+	* returns system_timestamp and according depth of sticker s for every frame received in the last 15 seconds
 	*/
 	void get_locations(stickers s, std::vector<double> *out_timestamps, std::vector<float> *out_loc);
 	
 	/**
 	* To be used in D mode (for plotting avg distance of stickers)
-	* returns system_timestamp and according avg distance of every frame  received in the last 15 seconds
-	* the avg distance is calculates only for distances set to true in config::dists_included
+	* returns system_timestamp and according avg distance of every frame received in the last 15 seconds
+	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
 	*/
 	void get_dists(std::vector<double> *out_timestamps, std::vector<float> *out_dists);
-
+	/**
+	* To be used in D mode 
+	* returns most dominant frequency, calculated for average distance in frames received in the last 15 seconds
+	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
+	*/
+	float get_frequency(std::vector<float> &dists, std::vector<double> &systime);
+	
 	Config user_cfg;
 	unsigned int _n_frames;
 	unsigned int _oldest_frame_index;
