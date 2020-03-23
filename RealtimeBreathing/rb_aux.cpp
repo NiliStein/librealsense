@@ -383,7 +383,8 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 					distances dist = dist_elem.first;
 					bool is_included = dist_elem.second;
 					if (is_included) { //if distance is included in user_cfg
-						avg_dist += *(_frame_data_arr[idx]->distances_map_depth[dist]);
+						std::map<distances, float*>* distances_map = (user_cfg.dimension == dimension::D2) ? &_frame_data_arr[idx]->distances_map_2d : &_frame_data_arr[idx]->distances_map_3d;
+						avg_dist += *((*distances_map)[dist]);
 						c += 1;
 					}
 				}
@@ -647,8 +648,12 @@ std::string BreathingFrameData::GetDescription()
 Config::Config(const char* config_filepath) {
 	std::ifstream config_file(config_filepath);
 	std::string line;
-	//get mode
+	//get dimension
 	std::getline(config_file, line); //first line is a comment
+	std::getline(config_file, line);
+	Config::dimension =  (line.compare("2") == 0) ? dimension::D2 : dimension::D3;
+	//get mode
+	std::getline(config_file, line); //next line is a comment
 	std::getline(config_file, line);
 	
 	if (line.compare("D") == 0) {

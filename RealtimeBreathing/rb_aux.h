@@ -9,6 +9,11 @@
 // OLD:
 //void save_last_frame(const char* filename, const rs2::video_frame& frame);
 
+enum dimension {
+	D2,
+	D3
+};
+
 enum graph_mode {
 	DISTANCES,
 	LOCATION
@@ -50,6 +55,7 @@ enum distances {
 */
 class Config {
 public:
+	dimension dimension;
 	graph_mode mode;
 	std::map<stickers, bool> stickers_included;
 	std::map<distances, bool> dists_included;
@@ -84,9 +90,9 @@ public:
 	cv::Vec3f left_cm, right_cm, mid1_cm, mid2_cm, mid3_cm; //(x,y,depth)
 	std::map<stickers, cv::Vec3f*> stickers_map_cm;
 	float dLM1, dLM2, dLM3, dLR, dRM1, dRM2, dRM3, dM1M2, dM1M3, dM2M3;
-	//float dLR, dML, dMR, dMD, dDL, dDR;
+	std::map<distances, float*> distances_map_2d;
 	float dLM1_depth, dLM2_depth, dLM3_depth, dLR_depth, dRM1_depth, dRM2_depth, dRM3_depth, dM1M2_depth, dM1M3_depth, dM2M3_depth;
-	std::map<distances, float*> distances_map_depth;
+	std::map<distances, float*> distances_map_3d;
 	//float dLR_depth, dML_depth, dMR_depth, dMD_depth, dDL_depth, dDR_depth;
 	float average_2d_dist;
 	float average_3d_dist;
@@ -99,9 +105,11 @@ public:
 		left(NULL), right(NULL), mid1(NULL), mid2(NULL), mid3(NULL),
 		stickers_map_cm({ {stickers::left, &left_cm}, {stickers::mid1, &mid1_cm}, {stickers::mid2, &mid2_cm}, {stickers::mid3, &mid3_cm}, {stickers::right, &right_cm} }),
 		dLM1(0.0), dLM2(0.0), dLM3(0.0), dLR(0.0), dRM1(0.0), dRM2(0.0), dRM3(0.0), dM1M2(0.0), dM1M3(0.0), dM2M3(0.0),
-		//dLR(0.0), dML(0.0), dMR(0.0), dMD(0.0), dDL(0.0), dDR(0.0),
+		distances_map_2d({ {distances::left_mid1, &dLM1}, {distances::left_mid2, &dLM2}, {distances::left_mid3, &dLM3}, {distances::left_right, &dLR},
+			{distances::right_mid1, &dRM1}, {distances::right_mid2, &dRM2}, {distances::right_mid3, &dRM3}, {distances::mid1_mid2, &dM1M2},
+			{distances::mid1_mid3, &dM1M3}, {distances::mid2_mid3, &dM2M3} }),
 		dLM1_depth(0.0), dLM2_depth(0.0), dLM3_depth(0.0), dLR_depth(0.0), dRM1_depth(0.0), dRM2_depth(0.0), dRM3_depth(0.0), dM1M2_depth(0.0), dM1M3_depth(0.0), dM2M3_depth(0.0),
-		distances_map_depth({ {distances::left_mid1, &dLM1_depth}, {distances::left_mid2, &dLM2_depth}, {distances::left_mid3, &dLM3_depth}, {distances::left_right, &dLR_depth},
+		distances_map_3d({ {distances::left_mid1, &dLM1_depth}, {distances::left_mid2, &dLM2_depth}, {distances::left_mid3, &dLM3_depth}, {distances::left_right, &dLR_depth},
 			{distances::right_mid1, &dRM1_depth}, {distances::right_mid2, &dRM2_depth}, {distances::right_mid3, &dRM3_depth}, {distances::mid1_mid2, &dM1M2_depth}, 
 			{distances::mid1_mid3, &dM1M3_depth}, {distances::mid2_mid3, &dM2M3_depth} }),
 		//dLR_depth(0.0), dML_depth(0.0), dMR_depth(0.0), dMD_depth(0.0), dDL_depth(0.0), dDR_depth(0.0),
