@@ -53,6 +53,76 @@ void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, c
 	output[2] = float(point[2]) * 100.0;
 }
 
+void FFT(short int dir, long m, double *x, double *y)
+{
+	long n, i, i1, j, k, i2, l, l1, l2;
+	double c1, c2, tx, ty, t1, t2, u1, u2, z;
+	/* Calculate the number of points */
+	n = 1;
+	for (i = 0; i < m; i++)
+		n *= 2;
+	/* Do the bit reversal */
+	i2 = n >> 1;
+	j = 0;
+
+
+	for (i = 0; i < n - 1; i++) {
+		if (i < j) {
+			tx = x[i];
+			ty = y[i];
+			x[i] = x[j];
+			y[i] = y[j];
+			x[j] = tx;
+			y[j] = ty;
+		}
+		k = i2;
+		while (k <= j) {
+			j -= k;
+			k >>= 1;
+		}
+		j += k;
+	}
+
+
+
+	/* Compute the FFT */
+	c1 = -1.0;
+	c2 = 0.0;
+	l2 = 1;
+	for (l = 0; l < m; l++) {
+		l1 = l2;
+		l2 <<= 1;
+		u1 = 1.0;
+		u2 = 0.0;
+		for (j = 0; j < l1; j++) {
+			for (i = j; i < n; i += l2) {
+				i1 = i + l1;
+				t1 = u1 * x[i1] - u2 * y[i1];
+				t2 = u1 * y[i1] + u2 * x[i1];
+				x[i1] = x[i] - t1;
+				y[i1] = y[i] - t2;
+				x[i] += t1;
+				y[i] += t2;
+			}
+			z = u1 * c1 - u2 * c2;
+			u2 = u1 * c2 + u2 * c1;
+			u1 = z;
+		}
+		c2 = sqrt((1.0 - c1) / 2.0);
+		if (dir == 1)
+			c2 = -c2;
+		c1 = sqrt((1.0 + c1) / 2.0);
+	}
+
+	/* Scaling for forward transform */
+    if (dir == 1) {
+        for (i=0;i<n;i++) {
+            x[i] /= n;
+            y[i] /= n;
+        }
+    }
+}
+
 /* Compare functions to sort the stickers: */
 
 static struct compareCirclesByY {
@@ -159,7 +229,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	cv::Mat image_th;
 	cv::Mat bin_mat(yellow_only_grayscale_mat.size(), yellow_only_grayscale_mat.type());
 	
-	//TODO: simple threshold worked better than adaptive
+	// simple threshold worked better than adaptive
 	cv::threshold(yellow_only_grayscale_mat, image_th, 100, 255, cv::THRESH_BINARY);
 	//TODO: remove?
 	//cv::adaptiveThreshold(yellow_only_grayscale_mat, image_th, 255,
@@ -216,18 +286,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//add color timestamp:
 	breathing_data->color_timestamp = color_frame.get_timestamp();
 
-	/*
-	//get depth of centroids:
-	cv::Vec3f& left_ref = *(breathing_data->left);
-	cv::Vec3f& right_ref = *(breathing_data->right);
-	cv::Vec3f& middle_ref = *(breathing_data->middle);
-	cv::Vec3f& down_ref = *(breathing_data->down);
-	left_ref[2] = depth_frame.get_distance(left_ref[0],left_ref[1]);
-	right_ref[2] = depth_frame.get_distance(right_ref[0], right_ref[1]);
-	middle_ref[2] = depth_frame.get_distance(middle_ref[0], middle_ref[1]);
-	down_ref[2] = depth_frame.get_distance(down_ref[0], down_ref[1]);
-	*/
-
 	//calculate 3D distances:
 	breathing_data->CalculateDistances3D();
 	
@@ -241,23 +299,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//TODO: for logging
 	logFile << breathing_data->GetDescription();
 
-	/* for debugging
-	
-	std::vector<float> out_loc;
-	std::vector<double> out_time;
-	get_locations(stickers::left, &out_time, &out_loc);
-	for (int i = 0; i < out_time.size(); i++) {
-		logFile << out_time.at(i) << ' ' << std::to_string(out_loc.at(i)) << '\n';
-	}
-	
-
-	std::vector<float> out_dists;
-	std::vector<double> out_time;
-	get_dists(&out_time, &out_dists);
-	for (int i = 0; i < out_time.size(); i++) {
-		logFile << out_time.at(i) << ' ' << std::to_string(out_dists.at(i)) << '\n';
-	}
-	*/
 	//TODO: for debugging:
 	if (this->interval_active) {
 		std::string interval_text = "\n------------------- start interval ---------------------\n";
@@ -265,12 +306,16 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	}
 	
 	add_frame_data(breathing_data);
-	std::vector<float> out_dists;
-	std::vector<double> out_time;
-	get_dists(&out_time, &out_dists);
+	
+	std::vector<cv::Point2d>* out = new std::vector<cv::Point2d>();
+	//get_locations(stickers::left, out);
 
-	float f = get_frequency(out_dists, out_time);
-	logFile << "Frequency: " << std::to_string(f) << ' ' << "BPM: " << 60.0*f << '\n';
+	get_dists(out);
+	if (out->size() > 40) {
+		long double f = get_frequency_fft(out);
+		logFile << "Frequency: " << f << " BPM: " << 60.0*f << "\n";
+	}
+
 }
 
 void FrameManager::cleanup()
@@ -298,58 +343,65 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 	_oldest_frame_index = (_oldest_frame_index + 1) % _n_frames;
 }
 
-void FrameManager::get_locations(stickers s, std::vector<double> *out_timestamps, std::vector<float> *out_loc) {
-	//TODO: check if order matters. if it does, iterate frames array according to time of arrival
-	if (_frame_data_arr != NULL) {
-		double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
-		for (unsigned int i = 0; i < _n_frames; i++) {
-			int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN then get_locations is run after add_frame_data (after _oldest_frame_idx++)
-			if (_frame_data_arr[idx] != NULL) {
-				//check if frame was received in under 15 sec
-				if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) {
-					out_timestamps->push_back(_frame_data_arr[idx]->system_timestamp);
-					out_loc->push_back((*_frame_data_arr[idx]->stickers_map_cm[s])[2]);
-				}
+
+void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
+	if (user_cfg.mode == graph_mode::DISTANCES) {
+		logFile << "Warning: get_locations was called in DISTANCES mode!\n";
+		return;
+	}
+	if (_frame_data_arr == NULL) return;	
+	
+	double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
+	for (unsigned int i = 0; i < _n_frames; i++) {
+		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_locations is run after add_frame_data (after _oldest_frame_idx++)
+		if (_frame_data_arr[idx] != NULL) {
+			//check if frame was received in under 15 sec
+			if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) {
+				out->push_back(cv::Point2d(_frame_data_arr[idx]->system_timestamp, (*_frame_data_arr[idx]->stickers_map_cm[s])[2]));
 			}
 		}
 	}
 }
 
-void FrameManager::get_dists(std::vector<double> *out_timestamps, std::vector<float> *out_dists) {
-	//TODO: check if order matters. if it does, iterate frames array according to time of arrival
-	if (_frame_data_arr != NULL) {
-		double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
-		for (unsigned int i = 0; i < _n_frames; i++) {
-			int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN then get_dists is run after add_frame_data (after _oldest_frame_idx++)
-			if (_frame_data_arr[idx] != NULL) {
-				//check if frame was received in under 15 sec
-				if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) {
-					out_timestamps->push_back(_frame_data_arr[idx]->system_timestamp);
-					float avg_dist = 0.0;
-					int c = 0;
-					for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
-						distances dist = dist_elem.first;
-						bool is_included = dist_elem.second;
-						if (is_included) { //if distance is included in user_cfg
-							avg_dist += *(_frame_data_arr[idx]->distances_map_depth[dist]);
-							c += 1;
-						}
+void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
+	if (user_cfg.mode == graph_mode::LOCATION) {
+		logFile << "Warning: get_dists was called in LOCATION mode!\n";
+		return;
+	}
+	if (_frame_data_arr == NULL) return;
+		
+	double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
+	for (unsigned int i = 0; i < _n_frames; i++) {
+		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_dists is run after add_frame_data (after _oldest_frame_idx++)
+		if (_frame_data_arr[idx] != NULL) {
+			//check if frame was received in under 15 sec
+			if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 2000.0) {//TODO: just include all? FPS is real low
+				double avg_dist = 0.0;
+				int c = 0;
+				double t = _frame_data_arr[idx]->system_timestamp;
+				for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
+					distances dist = dist_elem.first;
+					bool is_included = dist_elem.second;
+					if (is_included) { //if distance is included in user_cfg
+						avg_dist += *(_frame_data_arr[idx]->distances_map_depth[dist]);
+						c += 1;
 					}
-					avg_dist = avg_dist / (c*1.0);
-					out_dists->push_back(avg_dist);
 				}
+				
+				avg_dist = avg_dist / (1.0*c);
+				out->push_back(cv::Point2d(t, avg_dist));
 			}
 		}
 	}
 }
+
 // assuming dists and time are ordered according to time (oldest fisrt)
-// dists and time are of the same size
-float FrameManager::get_frequency(std::vector<float> &dists, std::vector<double> &systime) {
+long double FrameManager::get_frequency(std::vector<cv::Point2d>* samples) {
 	
-	int N = dists.size();	// N - number of samples (frames)
+	int N = samples->size();	// N - number of samples (frames)
 	
-	double t0 = systime[0];	// t0, t1 - start, end time(seconds)
-	double t1 = systime[N-1];
+	double t0 = samples->at(0).x;	// t0, t1 - start, end time(seconds)
+	double t1 = samples->at(N-1).x;
 	
 	int fps = N / (t1 - t0);	// FPS - frames per second
 	// t - vector of time signatures
@@ -363,36 +415,73 @@ float FrameManager::get_frequency(std::vector<float> &dists, std::vector<double>
 	std::vector<double> frequencies;
 	linespace(0, fps / 2, N / 2, &frequencies);
 	*/
-	std::vector<double> coef;
-	float C = 2 * PI / N;
-
-
+	//std::vector<double> coef;
+	
+	double C = 2 * PI / N;
 	int max_idx = 0;
 	double max_val = 0;
+	int mink = (4.0 / 60.0)*((N - 2.0) / fps);	// assume BPM >= 4
 	//calculate real part of coefficients
-	coef.push_back(0.0);	// //frequency 0 always most dominant. ignore first coef.
-	for (int k = 1; k <= N / 2; k++) {
-		coef.push_back(0.0);
+	for (int k = mink; k <= N / 2; k++) {	//frequency 0 always most dominant. ignore first coef.
+		double coef_re = 0.0;
+		double coef_im = 0.0;
 		for (int n = 0; n < N; n++) {
-			coef[k] += dists[n] * cos(C*k*n);
+			coef_re += samples->at(n).y * cos(C*k*n);
+			coef_im += samples->at(n).y * sin(C*k*n);
 		}
-		if (abs(coef[k]) > max_val) {
-			max_val = abs(coef[k]);
+		double abs_val = coef_re * coef_re + coef_im * coef_im;
+		if (abs_val > max_val) {
+			max_val = abs_val;
 			max_idx = k;
 		}
 	}
 	
-	/*
-	//get absolute value of first N/2 coefficients (only the real part)
+	float f = fps / (N - 2.0) * max_idx;
+	logFile << "method get_frequency (dft):\n";
+	logFile << "\nfrequency = fps / (N - 2.0) * max_idx: " << fps << " / (" << N << " - 2.0) * " << max_idx <<  " = " << f << '\n';
+
+	return f;
+}
+
+long double FrameManager::get_frequency_fft(std::vector<cv::Point2d>* samples) {
 	
-	for (int i = 1; i < N / 2; i++) { //frequency 0 always ,ost dominant. ignore first coef.
-		if (abs(coef[i]) > max_val) {
-			max_val = abs(coef[i]);
+	int realSamplesNum = samples->size();	// N - number of samples (frames)
+	const int paddedSamplesNum = 512;	// fft works requires that the number of samples is a power of 2
+	//const int paddedSamplesNum = 256;	// fft works requires that the number of samples is a power of 2
+	int dir = 1;
+	long m = log2(paddedSamplesNum);
+	double X[paddedSamplesNum] = { 0 };
+	for (int s = 0; s < realSamplesNum; s++) { // insert real samples in first #realSamplesNum slots
+		X[s] = samples->at(s).y;
+	}
+	double Y[paddedSamplesNum] = { 0 };	// no imaginary part in samples
+	double t0 = samples->at(0).x;	// t0, t1 - start, end time(seconds)
+	double t1 = samples->at(realSamplesNum - 1).x;
+	int fps = realSamplesNum / (t1 - t0);	// FPS - frames per second
+	
+	FFT(dir, m, X, Y);
+
+	int max_idx = 0;
+	double max_val = 0;
+	int max_idx_real = 0;
+	double max_val_real = 0;
+	int mini = (4.0 / 60.0)*((paddedSamplesNum - 2.0) / fps);	// assume BPM >= 4
+	for (int i = mini; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
+		//logFile << "\nX[" << i << "]: " << std::to_string(X[i]);
+		//logFile << "\nY[" << i << "]: " << std::to_string(Y[i]);
+
+		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);
+		//logFile << "val: " << val << '\n';
+		if (val > max_val) {
+			max_val = val;
 			max_idx = i;
 		}
 	}
-	*/
-	float f = fps / (N - 2.0) * max_idx;
+	logFile << "method get_frequency_fft:\n";
+	logFile << "fps: " << fps << '\n';
+	logFile << "realSamplesNum: " << realSamplesNum << '\n';
+	long double f = fps / (paddedSamplesNum - 2.0) * max_idx;
+	logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << max_idx << " = " << f << '\n';
 	return f;
 }
 
