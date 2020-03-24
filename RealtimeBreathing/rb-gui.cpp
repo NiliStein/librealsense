@@ -54,6 +54,7 @@ int main(int argc, char * argv[]) try
 	rs2::align align_to_color(RS2_STREAM_COLOR);
 
 	FrameManager frame_manager;
+	GraphPlot graph(frame_manager);
 
 	bool show_camera_stream = false;
 	bool stream_enabled = false;
@@ -225,6 +226,11 @@ int main(int argc, char * argv[]) try
 				frame_manager.activateInterval(); //activate calculation since we have 15 seconds at least
 			}
 
+			ImGui::NextColumn();
+
+			//TODO: plot data
+			graph.updateGraphPlot(frame_manager);
+			//TODO: plot frequencies
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);

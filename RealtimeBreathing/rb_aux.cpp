@@ -7,7 +7,7 @@
 #include <sstream>
 //#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
-
+#include <CvPlot/cvplot.h>
 
 //TODO: for logging
 #include <fstream>
@@ -390,7 +390,6 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 				
 			avg_dist = avg_dist / (1.0*c);
 			out->push_back(cv::Point2d(t, avg_dist));
-			
 		}
 	}
 }
@@ -712,9 +711,34 @@ Config::Config(const char* config_filepath) {
 	}
 }
 
+GraphPlot::GraphPlot(FrameManager& frame_manager) {
+	std::vector<cv::Point2d> out;
+	frame_manager.get_dists(&out);
+	//assign values to data vec:
+	for (int i = 0; i < out.size(); i++) {
+		data.push_back(out[i]);
+	}
+}
 
+GraphPlot::~GraphPlot() {
 
+}
 
+void GraphPlot::updateGraphPlot(FrameManager& frame_manager) {
+	auto axes = CvPlot::makePlotAxes();
+	std::vector<cv::Point2d> out;
+	frame_manager.get_dists(&out);
+	//assign values to data vec:
+	for (int i = 0; i < out.size(); i++) {
+		data.push_back(out[i]);
+	}
+	axes.create<CvPlot::Series>(data, "-oy");
+	CvPlot::showPlot(data);
+}
+
+void GraphPlot::plot() {
+	
+}
 
 
 

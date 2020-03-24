@@ -45,6 +45,9 @@
     <ClCompile Include="..\third-party\tinyfiledialogs\tinyfiledialogs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="cv-plot-1.2\CvPlot\src\cvplot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="realsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\macros.h">
@@ -321,6 +324,117 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rb_aux.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\libdef.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\version.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\cvplot.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Axes.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Drawable.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\DrawableDeque.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\makeAxes.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Projection.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\RenderTarget.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Transformation.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Border.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Group.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\HorizontalGrid.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\HorizontalLine.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Image.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\LineBase.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\LineType.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\MarkerType.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Series.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Title.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\VerticalGrid.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\VerticalLine.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\XAxis.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\XLabel.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\YAxis.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\YLabel.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\MouseAdapter.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\MouseEvent.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\show.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\Window.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\LinearProjection.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\no_warning.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\Pimpl.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\RawProjection.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\util.h">
       <Filter>Header Files\include</Filter>
     </ClInclude>
   </ItemGroup>

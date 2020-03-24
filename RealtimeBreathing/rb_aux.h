@@ -156,6 +156,30 @@ public:
 	void activateInterval();
 	void deactivateInterval();
 
+	/**
+	* To be used in L mode (for plotting locations of stickers)
+	* TODO: for now, return only z coordinate (depth)
+	* returns system_timestamp and according depth of sticker s for every frame received in the last 15 seconds
+	* if called in L mode, no points are pushed to vector out
+	*/
+	void get_locations(stickers s, std::vector<cv::Point2d> *out);
+
+	/**
+	* To be used in D mode (for plotting avg distance of stickers)
+	* returns system_timestamp and according avg distance of every frame received in the last 15 seconds
+	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
+	* if called in L mode, no points are pushed to vector out
+	*/
+	void get_dists(std::vector<cv::Point2d> *out);
+
+	/**
+	* To be used in D mode
+	* returns most dominant frequency, calculated for average distance in frames received in the last 15 seconds
+	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
+	*/
+	long double get_frequency(std::vector<cv::Point2d>* samples);
+	long double get_frequency_fft(std::vector<cv::Point2d>* samples);
+
 private:
 	/**
 	 * Cleans all allocated resources
@@ -167,29 +191,7 @@ private:
 	 * NOTE: only last n_frames saved so the oldest frame_data will be deleted 
 	 */
 	void add_frame_data(BreathingFrameData * frame_data);
-
-	/**
-	* To be used in L mode (for plotting locations of stickers)
-	* TODO: for now, return only z coordinate (depth)
-	* returns system_timestamp and according depth of sticker s for every frame received in the last 15 seconds
-	* if called in L mode, no points are pushed to vector out
-	*/
-	void get_locations(stickers s, std::vector<cv::Point2d> *out);
 	
-	/**
-	* To be used in D mode (for plotting avg distance of stickers)
-	* returns system_timestamp and according avg distance of every frame received in the last 15 seconds
-	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
-	* if called in L mode, no points are pushed to vector out
-	*/
-	void get_dists(std::vector<cv::Point2d> *out);
-	/**
-	* To be used in D mode 
-	* returns most dominant frequency, calculated for average distance in frames received in the last 15 seconds
-	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
-	*/
-	long double get_frequency(std::vector<cv::Point2d>* samples);
-	long double get_frequency_fft(std::vector<cv::Point2d>* samples);
 	Config user_cfg;
 	unsigned int _n_frames;
 	unsigned int _oldest_frame_index;
@@ -197,4 +199,26 @@ private:
 	const char* _frame_disk_path;
 	bool interval_active;
 	clock_t manager_start_time;
+};
+
+/*	GraphManager class.
+	Used for graph plotting.
+	@ data : vector of points, each point consists of x value and y value to plot.
+	@ plot_result : the matrix to render.
+*/
+class GraphPlot {
+private:
+	std::vector<cv::Point2d> data;
+public:
+	//ctor:
+	GraphPlot(FrameManager& frame_manager);
+
+	//dtor:
+	~GraphPlot();
+
+	/* Update the graph */
+	void updateGraphPlot(FrameManager& frame_manager);
+
+	/* plot the graph: */
+	void plot();
 };

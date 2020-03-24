@@ -92,7 +92,7 @@
       <Optimization>Disabled</Optimization>
       <ConformanceMode>false</ConformanceMode>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_UNICODE;NOMINMAX;ELPP_THREAD_SAFE;ELPP_NO_DEFAULT_LOG_FILE;BUILD_EASYLOGGINGPP;HWM_OVER_XU;RS2_USE_WMF_BACKEND;UNICODE;__SSSE3__;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Debug";INTERNAL_FW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;$(OPEN_CV)\build\install\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\RealtimeBreathing\cv-plot-1.2\CvPlot\inc;..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;$(OPEN_CV)\build\install\include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <SDLCheck>
       </SDLCheck>
@@ -137,7 +137,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_UNICODE;NOMINMAX;ELPP_THREAD_SAFE;ELPP_NO_DEFAULT_LOG_FILE;BUILD_EASYLOGGINGPP;HWM_OVER_XU;RS2_USE_WMF_BACKEND;UNICODE;__SSSE3__;_CRT_SECURE_NO_WARNINGS;CMAKE_INTDIR="Debug";INTERNAL_FW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;$(OPEN_CV)\build\install\include\;(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\RealtimeBreathing\cv-plot-1.2\CvPlot\inc;..\realsense2;..\src;..\examples\align\rs-align;..\examples\align\..\..\common;..\examples\align\..\..\third-party\imgui;..\include;..\third-party\glfw\include;..\common;..\third-party\glad;..\third-party;..\build;..\third-party\tinyfiledialogs;$(OPEN_CV)\build\install\include\;(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
@@ -159,6 +159,7 @@
     <ClCompile Include="..\third-party\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\third-party\imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\third-party\tinyfiledialogs\tinyfiledialogs.c" />
+    <ClCompile Include="cv-plot-1.2\CvPlot\src\cvplot.cpp" />
     <ClCompile Include="rb-gui.cpp" />
     <ClCompile Include="rb_aux.cpp" />
   </ItemGroup>
@@ -251,6 +252,43 @@
     <ClInclude Include="..\common\realsense-ui-advanced-mode.h" />
     <ClInclude Include="..\common\ux-alignment.h" />
     <ClInclude Include="..\third-party\stb_image.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Axes.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Drawable.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\DrawableDeque.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\makeAxes.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Projection.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\RenderTarget.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Transformation.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\cvplot.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Border.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Group.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\HorizontalGrid.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\HorizontalLine.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Image.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\LineBase.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\LineType.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\MarkerType.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Series.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\Title.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\VerticalGrid.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\VerticalLine.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\XAxis.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\XLabel.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\YAxis.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\drawables\YLabel.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\MouseAdapter.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\MouseEvent.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\show.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\gui\Window.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\LinearProjection.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\no_warning.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\Pimpl.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\RawProjection.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\util.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\libdef.h" />
+    <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\version.h" />
     <ClInclude Include="example.hpp" />
     <ClInclude Include="rb_aux.h" />
     <ClInclude Include="realsense\third-party\realsense-file\rosbag\rosbag_storage\include\rosbag\macros.h" />
