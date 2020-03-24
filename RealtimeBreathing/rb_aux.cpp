@@ -16,7 +16,7 @@
 #define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
 #define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define NUM_OF_STICKERS 4
-#define CALC_2D_BY_CM true //if false, calculate by pixels
+#define CALC_2D_BY_CM false //if false, calculate by pixels
 #define PI 3.14159265358979323846
 
 //TODO: for logging
@@ -356,7 +356,7 @@ void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
 		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_locations is run after add_frame_data (after _oldest_frame_idx++)
 		if (_frame_data_arr[idx] != NULL) {
 			//check if frame was received in under 15 sec
-			if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) {
+			if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) { //TODO: decide if needed
 				out->push_back(cv::Point2d(_frame_data_arr[idx]->system_timestamp, (*_frame_data_arr[idx]->stickers_map_cm[s])[2]));
 			}
 		}
@@ -375,23 +375,22 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_dists is run after add_frame_data (after _oldest_frame_idx++)
 		if (_frame_data_arr[idx] != NULL) {
 			//check if frame was received in under 15 sec
-			if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 2000.0) {//TODO: just include all? FPS is real low
-				double avg_dist = 0.0;
-				int c = 0;
-				double t = _frame_data_arr[idx]->system_timestamp;
-				for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
-					distances dist = dist_elem.first;
-					bool is_included = dist_elem.second;
-					if (is_included) { //if distance is included in user_cfg
-						std::map<distances, float*>* distances_map = (user_cfg.dimension == dimension::D2) ? &_frame_data_arr[idx]->distances_map_2d : &_frame_data_arr[idx]->distances_map_3d;
-						avg_dist += *((*distances_map)[dist]);
-						c += 1;
-					}
+			double avg_dist = 0.0;
+			int c = 0;
+			double t = _frame_data_arr[idx]->system_timestamp;
+			for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
+				distances dist = dist_elem.first;
+				bool is_included = dist_elem.second;
+				if (is_included) { //if distance is included in user_cfg
+					std::map<distances, float*>* distances_map = (user_cfg.dimension == dimension::D2) ? &_frame_data_arr[idx]->distances_map_2d : &_frame_data_arr[idx]->distances_map_3d;
+					avg_dist += *((*distances_map)[dist]);
+					c += 1;
 				}
-				
-				avg_dist = avg_dist / (1.0*c);
-				out->push_back(cv::Point2d(t, avg_dist));
 			}
+				
+			avg_dist = avg_dist / (1.0*c);
+			out->push_back(cv::Point2d(t, avg_dist));
+			
 		}
 	}
 }
@@ -461,18 +460,44 @@ long double FrameManager::get_frequency_fft(std::vector<cv::Point2d>* samples) {
 	int fps = realSamplesNum / (t1 - t0);	// FPS - frames per second
 	
 	FFT(dir, m, X, Y);
-
+	
+	/*const int top = 100;
+	int top_max_idx[top] = { 0 };
+	double min_bpm = 7.0;
+	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
+	for (int j = 0; j < top; j++) {
+		int max_idx = 0;
+		double max_val = 0;
+		for (int i = mini; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
+			double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);
+			if (val > max_val) {
+				max_val = val;
+				max_idx = i;
+			}
+		}
+		top_max_idx[j] = max_idx;
+		X[max_idx] = 0;
+	}
+	double avg_max_idx = 0;
+	for (int i = 0; i < top; i++)  avg_max_idx += top_max_idx[i];
+	avg_max_idx /= top;
+	logFile << "method get_frequency_fft:\n";
+	logFile << "fps: " << fps << '\n';
+	logFile << "realSamplesNum: " << realSamplesNum << '\n';
+	long double f = fps / (paddedSamplesNum - 2.0) * top_max_idx[0];
+	long double f_avg = fps / (paddedSamplesNum - 2.0) * avg_max_idx;
+	logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << top_max_idx[0] << " = " << f << '\n';
+	logFile << "frequency avg of two = fps / (paddedSamplesNum - 2.0) * avg_max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << avg_max_idx << "  = " << f_avg << '\n';
+	logFile << "    Frequency: " << f << "     BPM: " << 60.0*f << "\n";
+	logFile << "avg Frequency: " << f_avg << " avg BPM: " << 60.0*f_avg << "\n";
+	*/
+	
 	int max_idx = 0;
 	double max_val = 0;
-	int max_idx_real = 0;
-	double max_val_real = 0;
-	int mini = (4.0 / 60.0)*((paddedSamplesNum - 2.0) / fps);	// assume BPM >= 4
+	double min_bpm = 7.0;	// TODO: decide minimal BPM
+	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
 	for (int i = mini; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
-		//logFile << "\nX[" << i << "]: " << std::to_string(X[i]);
-		//logFile << "\nY[" << i << "]: " << std::to_string(Y[i]);
-
 		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);
-		//logFile << "val: " << val << '\n';
 		if (val > max_val) {
 			max_val = val;
 			max_idx = i;
@@ -483,6 +508,7 @@ long double FrameManager::get_frequency_fft(std::vector<cv::Point2d>* samples) {
 	logFile << "realSamplesNum: " << realSamplesNum << '\n';
 	long double f = fps / (paddedSamplesNum - 2.0) * max_idx;
 	logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << max_idx << " = " << f << '\n';
+
 	return f;
 }
 
@@ -545,7 +571,7 @@ void BreathingFrameData::CalculateDistances2D()
 			dM1M3 = CALC_2D_DIST((&mid1_cm), (&mid3_cm));
 		}
 	}
-	else {
+	else {	// calc by pixels
 		dLM2 = CALC_2D_DIST(left, mid2);
 		dLM3 = CALC_2D_DIST(left, mid3);
 		dLR = CALC_2D_DIST(left, right);
