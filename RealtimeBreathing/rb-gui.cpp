@@ -229,7 +229,8 @@ int main(int argc, char * argv[]) try
 			ImGui::NextColumn();
 
 			//TODO: plot data
-			graph.updateGraphPlot(frame_manager);
+			
+			if (frame_manager.get_frames_array_size() > 20) graph.plot(frame_manager);
 			//TODO: plot frequencies
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);

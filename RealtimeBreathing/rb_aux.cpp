@@ -7,7 +7,7 @@
 #include <sstream>
 //#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
-#include <CvPlot/cvplot.h>
+//#include <CvPlot/cvplot.h> // in .h file
 
 //TODO: for logging
 #include <fstream>
@@ -16,7 +16,7 @@
 #define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
 #define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define NUM_OF_STICKERS 4
-#define CALC_2D_BY_CM false //if false, calculate by pixels
+#define CALC_2D_BY_CM true //if false, calculate by pixels
 #define PI 3.14159265358979323846
 
 //TODO: for logging
@@ -195,6 +195,16 @@ FrameManager::~FrameManager()
 	}
 }
 
+int FrameManager::get_frames_array_size() {
+	int c = 0;
+	for (unsigned int i = 0; i < _n_frames; i++) {
+		if (_frame_data_arr[i] != NULL) {
+			c++;
+		}
+	}
+	return c;
+}
+
 void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame)
 {
 	// Create bgr mode matrix of color_frame
@@ -309,13 +319,13 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	
 	std::vector<cv::Point2d>* out = new std::vector<cv::Point2d>();
 	//get_locations(stickers::left, out);
-
+	/*
 	get_dists(out);
-	if (out->size() > 40) {
+	if (out->size() > 400) {
 		long double f = get_frequency_fft(out);
 		logFile << "Frequency: " << f << " BPM: " << 60.0*f << "\n";
 	}
-
+	*/
 }
 
 void FrameManager::cleanup()
@@ -377,7 +387,7 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 			//check if frame was received in under 15 sec
 			double avg_dist = 0.0;
 			int c = 0;
-			double t = _frame_data_arr[idx]->system_timestamp;
+			double t = _frame_data_arr[idx]->system_timestamp; 
 			for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
 				distances dist = dist_elem.first;
 				bool is_included = dist_elem.second;
@@ -712,12 +722,9 @@ Config::Config(const char* config_filepath) {
 }
 
 GraphPlot::GraphPlot(FrameManager& frame_manager) {
-	std::vector<cv::Point2d> out;
-	frame_manager.get_dists(&out);
-	//assign values to data vec:
-	for (int i = 0; i < out.size(); i++) {
-		data.push_back(out[i]);
-	}
+	axes = CvPlot::makePlotAxes();
+	clock_t current_system_time = clock();
+	time_begin = (current_system_time - frame_manager.manager_start_time) / double(CLOCKS_PER_SEC);
 }
 
 GraphPlot::~GraphPlot() {
@@ -725,19 +732,23 @@ GraphPlot::~GraphPlot() {
 }
 
 void GraphPlot::updateGraphPlot(FrameManager& frame_manager) {
-	auto axes = CvPlot::makePlotAxes();
-	std::vector<cv::Point2d> out;
-	frame_manager.get_dists(&out);
-	//assign values to data vec:
-	for (int i = 0; i < out.size(); i++) {
-		data.push_back(out[i]);
-	}
-	axes.create<CvPlot::Series>(data, "-oy");
-	CvPlot::showPlot(data);
+	frame_manager.get_dists(&data);
+	axes.create<CvPlot::Series>(data, ".b");
+	window->update();
+	
 }
 
-void GraphPlot::plot() {
-	
+void GraphPlot::plot(FrameManager& frame_manager) {
+	if (first) {
+		window = new CvPlot::Window("a", axes, 600, 800);
+		frame_manager.get_dists(&data);
+		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
+		axes.setYLim(std::pair<double, double>(0, 40));
+		first = false;
+	}
+	else {
+		updateGraphPlot(frame_manager);
+	}
 }
 
 

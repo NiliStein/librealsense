@@ -2,6 +2,7 @@
 
 #include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
+#include <CvPlot/cvplot.h>
 
 #define NUM_OF_LAST_FRAMES 450 //max number of 15 seconds under 30 fps
 #define CONFIG_FILEPATH "config.txt"
@@ -138,11 +139,16 @@ public:
 */
 class FrameManager {
 public:
+	clock_t manager_start_time;
+
 	//ctor
 	FrameManager(unsigned int n_frames = NUM_OF_LAST_FRAMES, const char * frame_disk_path = NULL);
 
 	//dtor
 	~FrameManager();
+
+
+	int get_frames_array_size();
 
 	/**
 	 * Processes a video color frame
@@ -198,7 +204,6 @@ private:
 	BreathingFrameData** _frame_data_arr;
 	const char* _frame_disk_path;
 	bool interval_active;
-	clock_t manager_start_time;
 };
 
 /*	GraphManager class.
@@ -209,6 +214,11 @@ private:
 class GraphPlot {
 private:
 	std::vector<cv::Point2d> data;
+	CvPlot::Window* window;
+	CvPlot::Axes axes = CvPlot::makePlotAxes();
+	bool first = true;
+	clock_t time_begin;
+	
 public:
 	//ctor:
 	GraphPlot(FrameManager& frame_manager);
@@ -220,5 +230,5 @@ public:
 	void updateGraphPlot(FrameManager& frame_manager);
 
 	/* plot the graph: */
-	void plot();
+	void plot(FrameManager& frame_manager);
 };
