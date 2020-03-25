@@ -20,6 +20,7 @@
 //struct GLFWmonitor;
 //struct GLFWwindow;
 
+#define RUN_FROM_FILE_ON_REPEAT false
 namespace rs2
 {
 	// Wrapper for cross-platform dialog control
@@ -86,20 +87,8 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
-		//if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); //&&&&&&&&&
-		//ImGui::End();
-
-		//if (show_camera_stream) {
-
-			//if (!stream_enabled) {
-			//	cfg.enable_stream(RS2_STREAM_DEPTH);
-			//	cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGB8);
-			//	pipe.start(cfg);
-
-			//	stream_enabled = true;
-			//}
-
-			
+		if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); //&&&&&&&&&
+		
 			if (show_camera_stream && !run_on_existing_file) {
 			
 				if (filename) {
@@ -155,10 +144,11 @@ int main(int argc, char * argv[]) try
 
 				if (!filename) {
 					filename = rs2::file_dialog_open(rs2::file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL);
-					cfg.enable_device_from_file(filename);
+					cfg.enable_device_from_file(filename, RUN_FROM_FILE_ON_REPEAT);
 					start_time = clock();
 					pipe.start(cfg); //File will be opened in read mode at this point
 				}
+				
 			}
 
 			if (!show_camera_stream && !run_on_existing_file) {
@@ -171,6 +161,8 @@ int main(int argc, char * argv[]) try
 					pipe.stop();
 					//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
 					filename = nullptr;
+					frame_manager.restart(); // reset FrameManager for additional processing
+					graph.restart(frame_manager);
 				}
 
 				if (stream_enabled) {
@@ -195,7 +187,28 @@ int main(int argc, char * argv[]) try
 			}
 
 			// using the align object, we block the application until a frameset is available
-			rs2::frameset fs = pipe.wait_for_frames();
+			//rs2::frameset fs = pipe.wait_for_frames(); &&&&&&&&&&&&&&&&&&&&&
+			rs2::frameset fs;
+			if (run_on_existing_file && !RUN_FROM_FILE_ON_REPEAT) {
+				if (!pipe.try_wait_for_frames(&fs, 10000)) {
+					/*
+					if run on file ended, stop pipe
+					*/
+					run_on_existing_file = false;
+					cfg.disable_all_streams();
+					cfg = rs2::config();
+					pipe.stop();
+					//reset filename argument, so that if 'choose existing file' is clicked again, a new explorer window will appear
+					filename = nullptr;
+					frame_manager.restart(); // reset FrameManager for additional processing
+					graph.restart(frame_manager);
+					continue;
+				}
+			}
+			else {
+				fs = pipe.wait_for_frames();
+			}
+
 		/*	rs2::frameset frameset_depth(fs);
 			rs2::frameset frameset_color(fs);*/
 
@@ -234,7 +247,6 @@ int main(int argc, char * argv[]) try
 
 			ImGui::NextColumn();
 
-			/* &&&&&&&&&&&&&&&&&&&&&&&&&&
 			
 			//TODO: plot data
 			if (user_cfg.mode == graph_mode::DISTANCES) {
@@ -242,12 +254,16 @@ int main(int argc, char * argv[]) try
 				f = graph.plotDists(frame_manager);
 				bpm = f * 60.0;
 			}
+			if (user_cfg.mode == graph_mode::FOURIER) {
+				f = graph.plotFourier(frame_manager);
+				bpm = f * 60.0;
+			}
 			if (user_cfg.mode == graph_mode::LOCATION) {
 				graph.plotLoc(frame_manager);
 			}
 			//if (frame_manager.get_frames_array_size() > 10) graph.plotBPM(frame_manager);
 			//TODO: plot frequencies
-			*/
+			
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);
 		

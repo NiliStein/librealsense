@@ -14,9 +14,11 @@
 
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
 #define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
-#define COORDINATES_TO_STRING(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
-#define NUM_OF_STICKERS 4
-#define CALC_2D_BY_CM true //if false, calculate by pixels
+#define COORDINATES_TO_STRING_CM(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
+#define COORDINATES_TO_STRING_PIXELS(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]))
+
+#define NUM_OF_STICKERS 5
+#define CALC_2D_BY_CM false //if false, calculate by pixels
 #define PI 3.14159265358979323846
 
 //TODO: for logging
@@ -195,6 +197,16 @@ FrameManager::~FrameManager()
 	}
 }
 
+void FrameManager::restart() {
+	_oldest_frame_index = 0;
+	interval_active = false;
+	manager_start_time = clock();
+	_frame_data_arr = new BreathingFrameData*[_n_frames];
+	for (unsigned int i = 0; i < _n_frames; i++) {
+		_frame_data_arr[i] = NULL;
+	}
+}
+
 int FrameManager::get_frames_array_size() {
 	int c = 0;
 	for (unsigned int i = 0; i < _n_frames; i++) {
@@ -309,12 +321,13 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	//TODO: for logging
 	logFile << breathing_data->GetDescription();
 
+	/*
 	//TODO: for debugging:
 	if (this->interval_active) {
 		std::string interval_text = "\n------------------- start interval ---------------------\n";
 		logFile << interval_text;
 	}
-	
+	*/
 	add_frame_data(breathing_data);
 	
 	
@@ -347,8 +360,8 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 
 
 void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
-	if (user_cfg->mode == graph_mode::DISTANCES) {
-		logFile << "Warning: get_locations was called in DISTANCES mode!\n";
+	if (user_cfg->mode != graph_mode::LOCATION) {
+		logFile << "Warning: get_locations was called in incompatible mode! (use L mode)\n";
 		return;
 	}
 	if (_frame_data_arr == NULL) return;	
@@ -444,7 +457,7 @@ long double FrameManager::cal_frequency_dft(std::vector<cv::Point2d>* samples) {
 	return f;
 }
 
-long double FrameManager::calc_frequency_fft(std::vector<cv::Point2d>* samples) {
+long double FrameManager::calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_frequencies) {
 	
 	int realSamplesNum = samples->size();	// N - number of samples (frames)
 	//const int paddedSamplesNum = 512;	// fft works requires that the number of samples is a power of 2 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -497,9 +510,13 @@ long double FrameManager::calc_frequency_fft(std::vector<cv::Point2d>* samples) 
 	double max_val = 0;
 	double min_bpm = 6.0;	// TODO: decide minimal BPM
 	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
-	for (int i = mini; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
-		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]); 
-		if (val > max_val) {
+	for (int i = 0; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
+		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);
+		if (out_frequencies != NULL) {
+			double frequency = fps / (paddedSamplesNum - 2.0) * i;
+			out_frequencies->push_back(cv::Point2d(frequency, val));
+		}
+		if(i >= mini && val > max_val) {
 			max_val = val;
 			max_idx = i;
 		}
@@ -629,15 +646,23 @@ void BreathingFrameData::CalculateDistances3D()
 
 std::string BreathingFrameData::GetDescription() 
 {
-	std::string desc = "Color timestamp: " + std::to_string(color_timestamp) +
+	const std::string d2method = (CALC_2D_BY_CM) ? "cm" : "pixels";
+	std::string desc = "#################################################\nColor timestamp: " + std::to_string(color_timestamp) +
 		"\nDepth timestamp: " + std::to_string(depth_timestamp) +
 		"\nSystem timestamp: " + std::to_string(system_timestamp) +
-		"\nCoordinates left: " + COORDINATES_TO_STRING((&left_cm)) +
-		"\nCoordinates right: " + COORDINATES_TO_STRING((&right_cm));
-	if (NUM_OF_STICKERS == 5) desc += "\nCoordinates mid1: " + COORDINATES_TO_STRING((&mid1_cm));
-	desc += "\nCoordinates mid2: " + COORDINATES_TO_STRING((&mid2_cm)) +
-		"\nCoordinates mid3: " + COORDINATES_TO_STRING((&mid3_cm)) +
-		"\n2D distances:";
+		"\nCoordinates cm:\n" +
+		"left: " + COORDINATES_TO_STRING_CM((&left_cm)) +
+		"\nright: " + COORDINATES_TO_STRING_CM((&right_cm));
+	if (NUM_OF_STICKERS == 5) desc += "\nmid1: " + COORDINATES_TO_STRING_CM((&mid1_cm));
+	desc += "\nmid2: " + COORDINATES_TO_STRING_CM((&mid2_cm)) +
+		"\nmid3: " + COORDINATES_TO_STRING_CM((&mid3_cm)) +
+		"\nCoordinates pixels:\n" + 
+		"left: " + COORDINATES_TO_STRING_PIXELS(left) +
+		"\nright: " + COORDINATES_TO_STRING_PIXELS(right);
+	if (NUM_OF_STICKERS == 5) desc += "\nmid1: " + COORDINATES_TO_STRING_PIXELS(mid1);
+	desc += "\nmid2: " + COORDINATES_TO_STRING_PIXELS(mid2) +
+		"\nmid3: " + COORDINATES_TO_STRING_PIXELS(mid3) +
+	"\n2D distances (" + d2method + "):";
 
 	if (NUM_OF_STICKERS == 5)  desc += "\nleft-mid1: " + std::to_string(dLM1);
 	desc += "\nleft-mid2: " + std::to_string(dLM2) +
@@ -665,8 +690,8 @@ std::string BreathingFrameData::GetDescription()
 			"\nmid1-mid3: " + std::to_string(dM1M3_depth);
 	}
 	desc += "\nmid2-mid3: " + std::to_string(dM2M3_depth) +
-		"\n2D average distance: " + std::to_string(average_2d_dist) +
-		"\n3D average distance: " + std::to_string(average_3d_dist) + "\n#################################################\n";
+		"\n2D average distance: " + std::to_string(average_2d_dist) + " " + d2method +
+		"\n3D average distance: " + std::to_string(average_3d_dist) + " cm\n";
 	return desc;
 }
 
@@ -682,8 +707,8 @@ Config::Config(const char* config_filepath) {
 	std::getline(config_file, line); //next line is a comment
 	std::getline(config_file, line);
 	
-	if (line.compare("D") == 0) {
-		Config::mode = graph_mode::DISTANCES;
+	if (line.compare("D") == 0 || line.compare("F") == 0) {
+		Config::mode = (line.compare("D") == 0) ? graph_mode::DISTANCES : graph_mode::FOURIER;
 		std::getline(config_file, line); // new line
 		std::getline(config_file, line); // comment
 		// get distances to include
@@ -719,39 +744,53 @@ GraphPlot::GraphPlot(FrameManager& frame_manager) {
 }
 
 GraphPlot::~GraphPlot() {
-
+	delete window;
 }
 
-void GraphPlot::updateGraphPlot(FrameManager& frame_manager) {
-	std::vector<cv::Point2d> points;
-	frame_manager.get_dists(&points);
-	axes.create<CvPlot::Series>(points, ".b");
-	window->update();
-	
+void GraphPlot::restart(FrameManager& frame_manager) {
+	first = true;
+	clock_t current_system_time = clock();
+	time_begin = (current_system_time - frame_manager.manager_start_time) / double(CLOCKS_PER_SEC);
 }
 
+long double GraphPlot::plotFourier(FrameManager& frame_manager) {
+	if (first) {
+		window = new CvPlot::Window("Fourier", axes, 600, 800);
+		axes.setXLim(std::pair<double, double>(0, 10));
+		axes.setYLim(std::pair<double, double>(0, 6000));
+		first = false;
+	}
+	return updatePlotFourier(frame_manager);
+}
 
-
-
-void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
-	std::vector<cv::Point2d> points;
-	frame_manager.get_locations(stickers::left, &points); //TODO: get sticker from user_cfg
-	axes.create<CvPlot::Series>(points, ".b");
+long double GraphPlot::updatePlotFourier(FrameManager& frame_manager) {
+	std::vector<cv::Point2d> dist_points;
+	std::vector<cv::Point2d> frequency_points;
+	frame_manager.get_dists(&dist_points);
+	long double f = (frame_manager.calc_frequency_fft(&dist_points, &frequency_points));
+	axes = CvPlot::makePlotAxes();
+	axes.setXLim(std::pair<double, double>(0, 10));
+	axes.setYLim(std::pair<double, double>(0, 40));
+	axes.create<CvPlot::Series>(frequency_points, "-k");
 	window->update();
-
+	return f;
 }
 
 void GraphPlot::plotLoc(FrameManager& frame_manager) {
 	if (first) {
 		window = new CvPlot::Window("Depth", axes, 600, 800);
 		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
-		axes.setYLim(std::pair<double, double>(0, 40));
+		axes.setYLim(std::pair<double, double>(30, 100));
 		first = false;
 	}
-	else {
-		updatePlotLoc(frame_manager);
-	}
+	updatePlotLoc(frame_manager);
+}
 
+void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
+	std::vector<cv::Point2d> points;
+	frame_manager.get_locations(stickers::left, &points); //TODO: get sticker from user_cfg
+	axes.create<CvPlot::Series>(points, "-k");
+	window->update();
 }
 
 long double GraphPlot::plotDists(FrameManager& frame_manager) {
@@ -760,26 +799,18 @@ long double GraphPlot::plotDists(FrameManager& frame_manager) {
 		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
 		axes.setYLim(std::pair<double, double>(0, 40));
 		first = false;
-		return 0;
 	}
-	else {
-		return updatePlotDists(frame_manager);
-	}
-
+	return updatePlotDists(frame_manager);
 }
-
-
 
 long double GraphPlot::updatePlotDists(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> points;
 	frame_manager.get_dists(&points);
 	long double f = (frame_manager.calc_frequency_fft(&points));
-	axes.create<CvPlot::Series>(points, "-g");
+	axes.create<CvPlot::Series>(points, "-k");
 	window->update();
 	return f;
 }
-
-
 /* OLD FUNCTIONS: */
 
 //void save_last_frame(const char* filename, const rs2::video_frame& frame) {

@@ -18,7 +18,8 @@ enum dimension {
 
 enum graph_mode {
 	DISTANCES,
-	LOCATION
+	LOCATION,
+	FOURIER
 };
 
 enum stickers {
@@ -147,7 +148,9 @@ public:
 
 	//dtor
 	~FrameManager();
-
+	
+	/* reset frame manager for another run (switch between files or between live camera to file and vice versa */
+	void restart();
 
 	int get_frames_array_size();
 
@@ -172,6 +175,7 @@ public:
 
 	/**
 	* To be used in D mode (for plotting avg distance of stickers)
+	* To be used in F mode for calculating fft
 	* returns system_timestamp and according avg distance of every frame received in the last 15 seconds
 	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
 	* if called in L mode, no points are pushed to vector out
@@ -183,7 +187,7 @@ public:
 	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
 	*/
 	long double cal_frequency_dft(std::vector<cv::Point2d>* samples);
-	long double calc_frequency_fft(std::vector<cv::Point2d>* samples);
+	long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_frequencies = NULL);
 	
 
 
@@ -225,12 +229,12 @@ public:
 
 	//dtor:
 	~GraphPlot();
+	
+	void restart(FrameManager& frame_manager);
 
-	/* Update the graph */
-	void updateGraphPlot(FrameManager& frame_manager);
+	long double plotFourier(FrameManager& frame_manager);
 
-
-
+	long double updatePlotFourier(FrameManager& frame_manager);
 
 	long double plotDists(FrameManager& frame_manager);
 
