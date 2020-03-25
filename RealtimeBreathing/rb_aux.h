@@ -4,7 +4,8 @@
 #include <opencv2/opencv.hpp>
 #include <CvPlot/cvplot.h>
 
-#define NUM_OF_LAST_FRAMES 450 //max number of 15 seconds under 30 fps
+//#define NUM_OF_LAST_FRAMES 450 //max number of 15 seconds under 30 fps //&&&&&&&&&&&&&
+#define NUM_OF_LAST_FRAMES 250 
 #define CONFIG_FILEPATH "config.txt"
 
 // OLD:
@@ -142,7 +143,7 @@ public:
 	clock_t manager_start_time;
 
 	//ctor
-	FrameManager(unsigned int n_frames = NUM_OF_LAST_FRAMES, const char * frame_disk_path = NULL);
+	FrameManager(Config* user_cfg, unsigned int n_frames = NUM_OF_LAST_FRAMES, const char * frame_disk_path = NULL);
 
 	//dtor
 	~FrameManager();
@@ -161,7 +162,6 @@ public:
 	/* Turn interval activity on/off: */
 	void activateInterval();
 	void deactivateInterval();
-
 	/**
 	* To be used in L mode (for plotting locations of stickers)
 	* TODO: for now, return only z coordinate (depth)
@@ -177,14 +177,15 @@ public:
 	* if called in L mode, no points are pushed to vector out
 	*/
 	void get_dists(std::vector<cv::Point2d> *out);
-
 	/**
 	* To be used in D mode
 	* returns most dominant frequency, calculated for average distance in frames received in the last 15 seconds
 	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
 	*/
-	long double get_frequency(std::vector<cv::Point2d>* samples);
-	long double get_frequency_fft(std::vector<cv::Point2d>* samples);
+	long double cal_frequency_dft(std::vector<cv::Point2d>* samples);
+	long double calc_frequency_fft(std::vector<cv::Point2d>* samples);
+	
+
 
 private:
 	/**
@@ -197,8 +198,8 @@ private:
 	 * NOTE: only last n_frames saved so the oldest frame_data will be deleted 
 	 */
 	void add_frame_data(BreathingFrameData * frame_data);
-	
-	Config user_cfg;
+
+	Config* user_cfg;
 	unsigned int _n_frames;
 	unsigned int _oldest_frame_index;
 	BreathingFrameData** _frame_data_arr;
@@ -213,7 +214,6 @@ private:
 */
 class GraphPlot {
 private:
-	std::vector<cv::Point2d> data;
 	CvPlot::Window* window;
 	CvPlot::Axes axes = CvPlot::makePlotAxes();
 	bool first = true;
@@ -231,4 +231,13 @@ public:
 
 	/* plot the graph: */
 	void plot(FrameManager& frame_manager);
+
+
+	long double plotDists(FrameManager& frame_manager);
+
+	long double updatePlotDists(FrameManager& frame_manager);
+	
+	void updatePlotLoc(FrameManager& frame_manager);
+	
+	void plotLoc(FrameManager& frame_manager);
 };

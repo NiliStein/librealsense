@@ -30,6 +30,9 @@ namespace rs2
 	const char* file_dialog_open(file_dialog_mode flags, const char* filters, const char* default_path, const char* default_name);
 }
 
+
+
+
 // *****	END of os.h copy	*****
 
 int main(int argc, char * argv[]) try
@@ -53,7 +56,8 @@ int main(int argc, char * argv[]) try
 	rs2::align align_to_depth(RS2_STREAM_DEPTH);
 	rs2::align align_to_color(RS2_STREAM_COLOR);
 
-	FrameManager frame_manager;
+	Config user_cfg(CONFIG_FILEPATH);
+	FrameManager frame_manager(&user_cfg);
 	GraphPlot graph(frame_manager);
 
 	bool show_camera_stream = false;
@@ -66,7 +70,8 @@ int main(int argc, char * argv[]) try
 	bool recording = false; //When true, record camera stream to file
 
 	clock_t start_time, end_time; //measure time, for 15 seconds intervals
-
+	long double f = 0; //&&&&&&&&&&&&&&&&&&&&&&&&
+	long double bpm = 0; //&&&&&&&&&&&&&&&&&&&&&&&&
 	while (app) // application still alive?
 	{
 		// Flags for displaying ImGui window
@@ -81,6 +86,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
+		if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); 
 		//ImGui::End();
 
 		//if (show_camera_stream) {
@@ -228,9 +234,18 @@ int main(int argc, char * argv[]) try
 
 			ImGui::NextColumn();
 
-			//TODO: plot data
+
 			
-			if (frame_manager.get_frames_array_size() > 20) graph.plot(frame_manager);
+			//TODO: plot data
+			if (user_cfg.mode == graph_mode::DISTANCES) {
+
+				f = graph.plotDists(frame_manager);
+				bpm = f * 60.0;
+			}
+			if (user_cfg.mode == graph_mode::LOCATION) {
+				graph.plotLoc(frame_manager);
+			}
+			//if (frame_manager.get_frames_array_size() > 10) graph.plotBPM(frame_manager);
 			//TODO: plot frequencies
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);

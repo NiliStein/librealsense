@@ -177,8 +177,8 @@ static struct compareCirclesByX {
 //	breathing_frame_data_vec->push_back(new_frame_data);
 //}
 
-FrameManager::FrameManager(unsigned int n_frames, const char * frame_disk_path) :
-	_n_frames(n_frames), _frame_disk_path(frame_disk_path), _oldest_frame_index(0), user_cfg(Config(CONFIG_FILEPATH)), interval_active(false)
+FrameManager::FrameManager(Config* cfg, unsigned int n_frames, const char * frame_disk_path) :
+	_n_frames(n_frames), _frame_disk_path(frame_disk_path), _oldest_frame_index(0), user_cfg(cfg), interval_active(false)
 {
 	manager_start_time = clock();
 	_frame_data_arr = new BreathingFrameData*[_n_frames];
@@ -319,13 +319,13 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	
 	std::vector<cv::Point2d>* out = new std::vector<cv::Point2d>();
 	//get_locations(stickers::left, out);
-	/*
+	
 	get_dists(out);
-	if (out->size() > 400) {
-		long double f = get_frequency_fft(out);
+	if (out->size() > 200) {
+		long double f = calc_frequency_fft(out);
 		logFile << "Frequency: " << f << " BPM: " << 60.0*f << "\n";
 	}
-	*/
+	
 }
 
 void FrameManager::cleanup()
@@ -355,7 +355,7 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 
 
 void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
-	if (user_cfg.mode == graph_mode::DISTANCES) {
+	if (user_cfg->mode == graph_mode::DISTANCES) {
 		logFile << "Warning: get_locations was called in DISTANCES mode!\n";
 		return;
 	}
@@ -374,7 +374,7 @@ void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
 }
 
 void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
-	if (user_cfg.mode == graph_mode::LOCATION) {
+	if (user_cfg->mode == graph_mode::LOCATION) {
 		logFile << "Warning: get_dists was called in LOCATION mode!\n";
 		return;
 	}
@@ -388,11 +388,11 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 			double avg_dist = 0.0;
 			int c = 0;
 			double t = _frame_data_arr[idx]->system_timestamp; 
-			for (std::pair<distances, bool> dist_elem : user_cfg.dists_included) {
+			for (std::pair<distances, bool> dist_elem : user_cfg->dists_included) {
 				distances dist = dist_elem.first;
 				bool is_included = dist_elem.second;
 				if (is_included) { //if distance is included in user_cfg
-					std::map<distances, float*>* distances_map = (user_cfg.dimension == dimension::D2) ? &_frame_data_arr[idx]->distances_map_2d : &_frame_data_arr[idx]->distances_map_3d;
+					std::map<distances, float*>* distances_map = (user_cfg->dimension == dimension::D2) ? &_frame_data_arr[idx]->distances_map_2d : &_frame_data_arr[idx]->distances_map_3d;
 					avg_dist += *((*distances_map)[dist]);
 					c += 1;
 				}
@@ -405,7 +405,7 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 }
 
 // assuming dists and time are ordered according to time (oldest fisrt)
-long double FrameManager::get_frequency(std::vector<cv::Point2d>* samples) {
+long double FrameManager::cal_frequency_dft(std::vector<cv::Point2d>* samples) {
 	
 	int N = samples->size();	// N - number of samples (frames)
 	
@@ -452,11 +452,11 @@ long double FrameManager::get_frequency(std::vector<cv::Point2d>* samples) {
 	return f;
 }
 
-long double FrameManager::get_frequency_fft(std::vector<cv::Point2d>* samples) {
+long double FrameManager::calc_frequency_fft(std::vector<cv::Point2d>* samples) {
 	
 	int realSamplesNum = samples->size();	// N - number of samples (frames)
-	const int paddedSamplesNum = 512;	// fft works requires that the number of samples is a power of 2
-	//const int paddedSamplesNum = 256;	// fft works requires that the number of samples is a power of 2
+	//const int paddedSamplesNum = 512;	// fft works requires that the number of samples is a power of 2 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	const int paddedSamplesNum = 256;	// fft works requires that the number of samples is a power of 2
 	int dir = 1;
 	long m = log2(paddedSamplesNum);
 	double X[paddedSamplesNum] = { 0 };
@@ -503,10 +503,10 @@ long double FrameManager::get_frequency_fft(std::vector<cv::Point2d>* samples) {
 	
 	int max_idx = 0;
 	double max_val = 0;
-	double min_bpm = 7.0;	// TODO: decide minimal BPM
+	double min_bpm = 6.0;	// TODO: decide minimal BPM
 	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
 	for (int i = mini; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
-		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);
+		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]); 
 		if (val > max_val) {
 			max_val = val;
 			max_idx = i;
@@ -520,7 +520,6 @@ long double FrameManager::get_frequency_fft(std::vector<cv::Point2d>* samples) {
 
 	return f;
 }
-
 
 void FrameManager::activateInterval() {
 	this->interval_active = true;
@@ -732,8 +731,9 @@ GraphPlot::~GraphPlot() {
 }
 
 void GraphPlot::updateGraphPlot(FrameManager& frame_manager) {
-	frame_manager.get_dists(&data);
-	axes.create<CvPlot::Series>(data, ".b");
+	std::vector<cv::Point2d> points;
+	frame_manager.get_dists(&points);
+	axes.create<CvPlot::Series>(points, ".b");
 	window->update();
 	
 }
@@ -741,7 +741,6 @@ void GraphPlot::updateGraphPlot(FrameManager& frame_manager) {
 void GraphPlot::plot(FrameManager& frame_manager) {
 	if (first) {
 		window = new CvPlot::Window("a", axes, 600, 800);
-		frame_manager.get_dists(&data);
 		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
 		axes.setYLim(std::pair<double, double>(0, 40));
 		first = false;
@@ -749,10 +748,55 @@ void GraphPlot::plot(FrameManager& frame_manager) {
 	else {
 		updateGraphPlot(frame_manager);
 	}
+
+}
+
+
+void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
+	std::vector<cv::Point2d> points;
+	frame_manager.get_locations(stickers::left, &points); //TODO: get sticker from user_cfg
+	axes.create<CvPlot::Series>(points, ".b");
+	window->update();
+
+}
+
+void GraphPlot::plotLoc(FrameManager& frame_manager) {
+	if (first) {
+		window = new CvPlot::Window("Depth", axes, 600, 800);
+		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
+		axes.setYLim(std::pair<double, double>(0, 40));
+		first = false;
+	}
+	else {
+		updatePlotLoc(frame_manager);
+	}
+
+}
+
+long double GraphPlot::plotDists(FrameManager& frame_manager) {
+	if (first) {
+		window = new CvPlot::Window("Distances", axes, 600, 800);
+		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
+		axes.setYLim(std::pair<double, double>(0, 40));
+		first = false;
+		return 0;
+	}
+	else {
+		return updatePlotDists(frame_manager);
+	}
+
 }
 
 
 
+long double GraphPlot::updatePlotDists(FrameManager& frame_manager) {
+	std::vector<cv::Point2d> points;
+	frame_manager.get_dists(&points);
+	long double f = (frame_manager.calc_frequency_fft(&points));
+	axes.create<CvPlot::Series>(points, "-g");
+	window->update();
+	return f;
+}
 
 
 /* OLD FUNCTIONS: */
