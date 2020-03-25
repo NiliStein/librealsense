@@ -380,6 +380,8 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 	}
 	if (_frame_data_arr == NULL) return;
 		
+	out->clear(); //clear the data
+
 	double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
 	for (unsigned int i = 0; i < _n_frames; i++) {
 		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_dists is run after add_frame_data (after _oldest_frame_idx++)
@@ -504,6 +506,10 @@ long double FrameManager::calc_frequency_fft(std::vector<cv::Point2d>* samples) 
 	int max_idx = 0;
 	double max_val = 0;
 	double min_bpm = 6.0;	// TODO: decide minimal BPM
+
+	if (fps == 0) {
+		return 0;
+	}
 	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
 	for (int i = mini; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
 		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]); 
@@ -721,7 +727,11 @@ Config::Config(const char* config_filepath) {
 }
 
 GraphPlot::GraphPlot(FrameManager& frame_manager) {
-	axes = CvPlot::makePlotAxes();
+	CvPlot::Axes* axes = new CvPlot::Axes(CvPlot::makePlotAxes());
+	axes->setXLimAuto();
+	axes->setYLim(std::pair<double, double>(0, 40));
+	//axes->create<CvPlot::Series>(data, ".b").setName("data series");
+	window = new CvPlot::Window("Breathing Graph", *axes);
 	clock_t current_system_time = clock();
 	time_begin = (current_system_time - frame_manager.manager_start_time) / double(CLOCKS_PER_SEC);
 }
@@ -733,36 +743,42 @@ GraphPlot::~GraphPlot() {
 void GraphPlot::updateGraphPlot(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> points;
 	frame_manager.get_dists(&points);
-	axes.create<CvPlot::Series>(points, ".b");
+	CvPlot::Axes& axes = window->getAxes();
+	axes.find<CvPlot::Series>("data series")->setPoints(points);
 	window->update();
-	
 }
 
-void GraphPlot::plot(FrameManager& frame_manager) {
-	if (first) {
-		window = new CvPlot::Window("a", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
-		axes.setYLim(std::pair<double, double>(0, 40));
-		first = false;
-	}
-	else {
-		updateGraphPlot(frame_manager);
-	}
-
-}
+//void GraphPlot::plot(FrameManager& frame_manager) {
+//	if (first) {
+//		//window = new CvPlot::Window("a", axes, 600, 800);
+//		auto &axes = window->getAxes();
+//		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
+//		axes.setYLim(std::pair<double, double>(0, 40));
+//		std::vector<cv::Point2d> points;
+//		frame_manager.get_dists(&points);
+//		first = false;
+//	}
+//	else {
+//		updateGraphPlot(frame_manager);
+//	}
+//
+//}
 
 
 void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> points;
 	frame_manager.get_locations(stickers::left, &points); //TODO: get sticker from user_cfg
-	axes.create<CvPlot::Series>(points, ".b");
+	auto &axes = window->getAxes();
+	axes.find<CvPlot::Series>("location series")->setPoints(points);
 	window->update();
-
 }
 
 void GraphPlot::plotLoc(FrameManager& frame_manager) {
 	if (first) {
-		window = new CvPlot::Window("Depth", axes, 600, 800);
+		//window = new CvPlot::Window("Depth", axes, 600, 800);
+		auto &axes = window->getAxes();
+		//create the series for the first time:
+		axes.create<CvPlot::Series>(".g").setName("location series");
 		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
 		axes.setYLim(std::pair<double, double>(0, 40));
 		first = false;
@@ -775,7 +791,10 @@ void GraphPlot::plotLoc(FrameManager& frame_manager) {
 
 long double GraphPlot::plotDists(FrameManager& frame_manager) {
 	if (first) {
-		window = new CvPlot::Window("Distances", axes, 600, 800);
+		//window = new CvPlot::Window("Distances", axes, 600, 800);
+		auto &axes = window->getAxes();
+		//create the series for the first time:
+		axes.create<CvPlot::Series>(".b").setName("distances series");
 		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
 		axes.setYLim(std::pair<double, double>(0, 40));
 		first = false;
@@ -787,17 +806,22 @@ long double GraphPlot::plotDists(FrameManager& frame_manager) {
 
 }
 
-
-
 long double GraphPlot::updatePlotDists(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> points;
 	frame_manager.get_dists(&points);
 	long double f = (frame_manager.calc_frequency_fft(&points));
-	axes.create<CvPlot::Series>(points, "-g");
+	CvPlot::Axes& axes = window->getAxes();
+	axes.find<CvPlot::Series>("distances series")->setPoints(points);
 	window->update();
 	return f;
 }
 
+void showGraph::operator()(GraphPlot* graph, FrameManager* frame_manager) {
+	while (true) {
+		if (frame_manager->get_frames_array_size() > 20)
+			graph->plotDists(*frame_manager);
+	}
+}
 
 /* OLD FUNCTIONS: */
 

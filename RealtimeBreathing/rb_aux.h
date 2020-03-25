@@ -27,7 +27,7 @@ enum stickers {
 	mid2,
 	mid3,
 	right,
-	sdummy // needed for enum iteration
+	sdummy //needed for enum iteration
 };
 
 enum distances {
@@ -215,10 +215,10 @@ private:
 class GraphPlot {
 private:
 	CvPlot::Window* window;
-	CvPlot::Axes axes = CvPlot::makePlotAxes();
 	bool first = true;
 	clock_t time_begin;
-	
+	//std::vector<cv::Point2d> data;
+
 public:
 	//ctor:
 	GraphPlot(FrameManager& frame_manager);
@@ -230,8 +230,7 @@ public:
 	void updateGraphPlot(FrameManager& frame_manager);
 
 	/* plot the graph: */
-	void plot(FrameManager& frame_manager);
-
+	//void plot(FrameManager& frame_manager);
 
 	long double plotDists(FrameManager& frame_manager);
 
@@ -240,4 +239,12 @@ public:
 	void updatePlotLoc(FrameManager& frame_manager);
 	
 	void plotLoc(FrameManager& frame_manager);
+};
+
+
+//function object for multithreading:
+class showGraph {
+public:
+	//thread does not accept references
+	void operator()(GraphPlot* graph, FrameManager* frame_manager);
 };

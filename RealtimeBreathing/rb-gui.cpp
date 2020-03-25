@@ -9,6 +9,7 @@
 #include "rb_aux.h"
 #include <opencv2/opencv.hpp>
 #include <chrono>
+#include <thread>
 
 // copied os.h because project does comile when including it (seems to be due to double inclusion of rendering.h)
 // *****	START of os.h copy	*****
@@ -59,6 +60,10 @@ int main(int argc, char * argv[]) try
 	Config user_cfg(CONFIG_FILEPATH);
 	FrameManager frame_manager(&user_cfg);
 	GraphPlot graph(frame_manager);
+
+	//create a new thread to handle the graph plotting:
+	std::thread graph_thread(showGraph(), &graph, &frame_manager);
+	//graph_thread.join();
 
 	bool show_camera_stream = false;
 	bool stream_enabled = false;
@@ -233,8 +238,6 @@ int main(int argc, char * argv[]) try
 			}
 
 			ImGui::NextColumn();
-
-
 			
 			//TODO: plot data
 			if (user_cfg.mode == graph_mode::DISTANCES) {
@@ -245,7 +248,8 @@ int main(int argc, char * argv[]) try
 			if (user_cfg.mode == graph_mode::LOCATION) {
 				graph.plotLoc(frame_manager);
 			}
-			//if (frame_manager.get_frames_array_size() > 10) graph.plotBPM(frame_manager);
+			//TODO: plot data
+			//if (frame_manager.get_frames_array_size() > 20) graph.plot(frame_manager);
 			//TODO: plot frequencies
 
 			glColor4f(1.f, 1.f, 1.f, 1.f);
