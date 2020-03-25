@@ -317,14 +317,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	
 	add_frame_data(breathing_data);
 	
-	std::vector<cv::Point2d>* out = new std::vector<cv::Point2d>();
-	//get_locations(stickers::left, out);
-	
-	get_dists(out);
-	if (out->size() > 200) {
-		long double f = calc_frequency_fft(out);
-		logFile << "Frequency: " << f << " BPM: " << 60.0*f << "\n";
-	}
 	
 }
 
@@ -738,18 +730,7 @@ void GraphPlot::updateGraphPlot(FrameManager& frame_manager) {
 	
 }
 
-void GraphPlot::plot(FrameManager& frame_manager) {
-	if (first) {
-		window = new CvPlot::Window("a", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
-		axes.setYLim(std::pair<double, double>(0, 40));
-		first = false;
-	}
-	else {
-		updateGraphPlot(frame_manager);
-	}
 
-}
 
 
 void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {

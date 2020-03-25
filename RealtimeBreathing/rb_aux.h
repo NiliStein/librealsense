@@ -229,8 +229,7 @@ public:
 	/* Update the graph */
 	void updateGraphPlot(FrameManager& frame_manager);
 
-	/* plot the graph: */
-	void plot(FrameManager& frame_manager);
+
 
 
 	long double plotDists(FrameManager& frame_manager);

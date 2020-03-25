@@ -70,8 +70,8 @@ int main(int argc, char * argv[]) try
 	bool recording = false; //When true, record camera stream to file
 
 	clock_t start_time, end_time; //measure time, for 15 seconds intervals
-	long double f = 0; //&&&&&&&&&&&&&&&&&&&&&&&&
-	long double bpm = 0; //&&&&&&&&&&&&&&&&&&&&&&&&
+	long double f = 0; 
+	long double bpm = 0;
 	while (app) // application still alive?
 	{
 		// Flags for displaying ImGui window
@@ -86,7 +86,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
-		if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); 
+		//if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); //&&&&&&&&&
 		//ImGui::End();
 
 		//if (show_camera_stream) {
@@ -234,7 +234,7 @@ int main(int argc, char * argv[]) try
 
 			ImGui::NextColumn();
 
-
+			/* &&&&&&&&&&&&&&&&&&&&&&&&&&
 			
 			//TODO: plot data
 			if (user_cfg.mode == graph_mode::DISTANCES) {
@@ -247,7 +247,7 @@ int main(int argc, char * argv[]) try
 			}
 			//if (frame_manager.get_frames_array_size() > 10) graph.plotBPM(frame_manager);
 			//TODO: plot frequencies
-
+			*/
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);
 		
