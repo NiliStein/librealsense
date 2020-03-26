@@ -142,6 +142,7 @@ public:
 class FrameManager {
 public:
 	clock_t manager_start_time;
+	Config* user_cfg;
 
 	//ctor
 	FrameManager(Config* user_cfg, unsigned int n_frames = NUM_OF_LAST_FRAMES, const char * frame_disk_path = NULL);
@@ -203,7 +204,6 @@ private:
 	 */
 	void add_frame_data(BreathingFrameData * frame_data);
 
-	Config* user_cfg;
 	unsigned int _n_frames;
 	unsigned int _oldest_frame_index;
 	BreathingFrameData** _frame_data_arr;
@@ -219,9 +219,12 @@ private:
 class GraphPlot {
 private:
 	CvPlot::Window* window;
-	CvPlot::Axes axes = CvPlot::makePlotAxes();
+	CvPlot::Axes axes;
 	bool first = true;
 	clock_t time_begin;
+	int Fx_LOWER_BOUND = 0, Fx_UPPER_BOUND = 10, Fy_LOWER_BOUND = 0, Fy_UPPER_BOUND = 50;
+	int Dx_LOWER_BOUND = time_begin, Dx_UPPER_BOUND = time_begin + 90, Dy_LOWER_BOUND = 30, Dy_UPPER_BOUND = 500;
+	int Lx_LOWER_BOUND = time_begin, Lx_UPPER_BOUND = time_begin + 90, Ly_LOWER_BOUND = 30, Ly_UPPER_BOUND = 100;
 	
 public:
 	//ctor:

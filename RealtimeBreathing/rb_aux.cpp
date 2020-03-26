@@ -17,10 +17,9 @@
 #define COORDINATES_TO_STRING_CM(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define COORDINATES_TO_STRING_PIXELS(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]))
 
-#define NUM_OF_STICKERS 5
+#define NUM_OF_STICKERS 4
 #define CALC_2D_BY_CM false //if false, calculate by pixels
 #define PI 3.14159265358979323846
-
 //TODO: for logging
 std::ofstream logFile("log.txt");
 
@@ -719,6 +718,15 @@ Config::Config(const char* config_filepath) {
 			std::string val = line.substr(line.length() - 1, line.length());
 			Config::dists_included[d] = (val.compare("y") == 0) ? true : false;
 		}
+		//if NUM_OF_STICKERS is 4, there is no mid1 sticker
+		if (NUM_OF_STICKERS == 4) {
+			if (dists_included[distances::left_mid1] || dists_included[distances::mid1_mid2] ||
+				dists_included[distances::mid1_mid3] || dists_included[distances::right_mid1]) {
+				logFile << "Warning: distance from mid1 was set to y, while number of stickers is 4. This distance will be disregarded.\n";
+				dists_included[distances::left_mid1] = dists_included[distances::mid1_mid2] =
+					dists_included[distances::mid1_mid3] = dists_included[distances::right_mid1] = false;
+			}
+		}
 	}
 	else {
 		Config::mode = graph_mode::LOCATION;
@@ -733,6 +741,13 @@ Config::Config(const char* config_filepath) {
 			std::getline(config_file, line);
 			std::string val = line.substr(line.length() - 1, line.length());
 			Config::stickers_included[s] = (val.compare("y") == 0) ? true : false;
+		}
+		//if NUM_OF_STICKERS is 4, there is no mid1 sticker
+		if (NUM_OF_STICKERS == 4) {
+			if (stickers_included[stickers::mid1]) {
+				logFile << "Warning: location of mid1 was set to y, while number of stickers is 4. This location will be disregarded.\n";
+				stickers_included[stickers::mid1] = false;
+			}
 		}
 	}
 }
@@ -751,13 +766,19 @@ void GraphPlot::restart(FrameManager& frame_manager) {
 	first = true;
 	clock_t current_system_time = clock();
 	time_begin = (current_system_time - frame_manager.manager_start_time) / double(CLOCKS_PER_SEC);
+	Dx_LOWER_BOUND = time_begin;
+	Dx_UPPER_BOUND = time_begin + 90;
+	Lx_LOWER_BOUND = time_begin;
+	Lx_UPPER_BOUND = time_begin + 90;
+	axes = CvPlot::makePlotAxes();
+	delete window;
 }
 
 long double GraphPlot::plotFourier(FrameManager& frame_manager) {
 	if (first) {
 		window = new CvPlot::Window("Fourier", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(0, 10));
-		axes.setYLim(std::pair<double, double>(0, 6000));
+		axes.setXLim(std::pair<double, double>(Fx_LOWER_BOUND, Fx_UPPER_BOUND));
+		axes.setYLim(std::pair<double, double>(Fy_LOWER_BOUND, Fy_UPPER_BOUND));
 		first = false;
 	}
 	return updatePlotFourier(frame_manager);
@@ -769,8 +790,8 @@ long double GraphPlot::updatePlotFourier(FrameManager& frame_manager) {
 	frame_manager.get_dists(&dist_points);
 	long double f = (frame_manager.calc_frequency_fft(&dist_points, &frequency_points));
 	axes = CvPlot::makePlotAxes();
-	axes.setXLim(std::pair<double, double>(0, 10));
-	axes.setYLim(std::pair<double, double>(0, 40));
+	axes.setXLim(std::pair<double, double>(Fx_LOWER_BOUND, Fx_UPPER_BOUND));
+	axes.setYLim(std::pair<double, double>(Fy_LOWER_BOUND, Fy_UPPER_BOUND));
 	axes.create<CvPlot::Series>(frequency_points, "-k");
 	window->update();
 	return f;
@@ -779,25 +800,32 @@ long double GraphPlot::updatePlotFourier(FrameManager& frame_manager) {
 void GraphPlot::plotLoc(FrameManager& frame_manager) {
 	if (first) {
 		window = new CvPlot::Window("Depth", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
-		axes.setYLim(std::pair<double, double>(30, 100));
+		axes.setXLim(std::pair<double, double>(Lx_LOWER_BOUND, Lx_UPPER_BOUND));
+		axes.setYLim(std::pair<double, double>(Ly_LOWER_BOUND, Ly_UPPER_BOUND));
 		first = false;
 	}
 	updatePlotLoc(frame_manager);
 }
 
 void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
-	std::vector<cv::Point2d> points;
-	frame_manager.get_locations(stickers::left, &points); //TODO: get sticker from user_cfg
-	axes.create<CvPlot::Series>(points, "-k");
+	std::vector<cv::Point2d> points[5];
+	const std::string lineSpec[5] = { "-k", "-g", "-b", "-r", "-y" };
+	//axes = CvPlot::makePlotAxes();
+	for (int stInt = stickers::left; stInt != stickers::sdummy; stInt++) {
+		stickers s = static_cast<stickers>(stInt);
+		if (frame_manager.user_cfg->stickers_included[s]) {
+			frame_manager.get_locations(s, &points[stInt]);
+			axes.create<CvPlot::Series>(points[stInt], lineSpec[stInt]);
+		}
+	}
 	window->update();
 }
 
 long double GraphPlot::plotDists(FrameManager& frame_manager) {
 	if (first) {
 		window = new CvPlot::Window("Distances", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(time_begin, time_begin + 90));
-		axes.setYLim(std::pair<double, double>(0, 40));
+		axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND));
+		axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND));
 		first = false;
 	}
 	return updatePlotDists(frame_manager);
@@ -807,7 +835,8 @@ long double GraphPlot::updatePlotDists(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> points;
 	frame_manager.get_dists(&points);
 	long double f = (frame_manager.calc_frequency_fft(&points));
-	axes.create<CvPlot::Series>(points, "-k");
+	//axes = CvPlot::makePlotAxes();
+	axes.create<CvPlot::Series>(points, "-b");
 	window->update();
 	return f;
 }
