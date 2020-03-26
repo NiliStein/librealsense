@@ -1,6 +1,6 @@
 #include "rb_aux.h"
+#include "utilities.h"
 #include "os.h"
-#include <librealsense2/rsutil.h>
 #include <cstdio>
 #include <string>
 #include <ctime>
@@ -17,112 +17,11 @@
 #define COORDINATES_TO_STRING_CM(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define COORDINATES_TO_STRING_PIXELS(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]))
 
-#define NUM_OF_STICKERS 4
+#define NUM_OF_STICKERS 5
 #define CALC_2D_BY_CM false //if false, calculate by pixels
 #define PI 3.14159265358979323846
 //TODO: for logging
 std::ofstream logFile("log.txt");
-
-// fill out with n values, evely spaced (hopefully) between a and b, including a and b
-void linespace(double a, double b, int n, std::vector<double>* out) {
-	double step = (b - a) / (n - 1);
-	for(int i = 0; i < n - 1; i++) {
-		out->push_back(a);
-		a += step;           // could recode to better handle rounding errors
-	}
-	out->push_back(b);
-}
-
-static float distance2D(float x, float y, float a, float b) {
-	return sqrt(pow(x - a, 2) + pow(y - b, 2));
-}
-
-static float distance3D(float x, float y, float z, float a, float b, float c) {
-	return sqrt(pow(x - a, 2) + pow(y - b, 2) + pow(z - c, 2));
-}
-
-void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
-	
-	float pixel[2] = { x, y };
-	float point[3]; // From point (in 3D)
-	auto dist = depth_frame.get_distance(pixel[0], pixel[1]);
-	rs2_intrinsics intr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
-	rs2_deproject_pixel_to_point(point, &intr, pixel, dist);
-
-	output[0] = float(point[0]) * 100.0;//convert to cm
-	output[1] = float(point[1]) * 100.0;
-	output[2] = float(point[2]) * 100.0;
-}
-
-void FFT(short int dir, long m, double *x, double *y)
-{
-	long n, i, i1, j, k, i2, l, l1, l2;
-	double c1, c2, tx, ty, t1, t2, u1, u2, z;
-	/* Calculate the number of points */
-	n = 1;
-	for (i = 0; i < m; i++)
-		n *= 2;
-	/* Do the bit reversal */
-	i2 = n >> 1;
-	j = 0;
-
-
-	for (i = 0; i < n - 1; i++) {
-		if (i < j) {
-			tx = x[i];
-			ty = y[i];
-			x[i] = x[j];
-			y[i] = y[j];
-			x[j] = tx;
-			y[j] = ty;
-		}
-		k = i2;
-		while (k <= j) {
-			j -= k;
-			k >>= 1;
-		}
-		j += k;
-	}
-
-
-
-	/* Compute the FFT */
-	c1 = -1.0;
-	c2 = 0.0;
-	l2 = 1;
-	for (l = 0; l < m; l++) {
-		l1 = l2;
-		l2 <<= 1;
-		u1 = 1.0;
-		u2 = 0.0;
-		for (j = 0; j < l1; j++) {
-			for (i = j; i < n; i += l2) {
-				i1 = i + l1;
-				t1 = u1 * x[i1] - u2 * y[i1];
-				t2 = u1 * y[i1] + u2 * x[i1];
-				x[i1] = x[i] - t1;
-				y[i1] = y[i] - t2;
-				x[i] += t1;
-				y[i] += t2;
-			}
-			z = u1 * c1 - u2 * c2;
-			u2 = u1 * c2 + u2 * c1;
-			u1 = z;
-		}
-		c2 = sqrt((1.0 - c1) / 2.0);
-		if (dir == 1)
-			c2 = -c2;
-		c1 = sqrt((1.0 + c1) / 2.0);
-	}
-
-	/* Scaling for forward transform */
-    if (dir == 1) {
-        for (i=0;i<n;i++) {
-            x[i] /= n;
-            y[i] /= n;
-        }
-    }
-}
 
 /* Compare functions to sort the stickers: */
 
@@ -139,44 +38,6 @@ static struct compareCirclesByX {
 		return (c1[0] < c2[0]);
 	}
 } compareCirclesByXFunc;
-
-//void process_frame_data(cv::Mat& frame_bgr8_mat, double color_timestamp) {
-//	static FrameDataVec frame_data_vec;
-//	std::vector<BreathingFrameData>* breathing_frame_data_vec = &(frame_data_vec.data_vec);
-//	BreathingFrameData new_frame_data;
-//
-//	//find yellows:
-//	Mat yellow_only_mat;
-//	inRange(frame_bgr8_mat, Scalar(0, 180, 255), Scalar(170, 255, 255), yellow_only_mat); //yellow bgr range
-//	Mat yellow_only_grayscale_mat;
-//
-//	//Convert it to gray
-//	cvtColor(yellow_only_mat, yellow_only_grayscale_mat, COLOR_BGR2GRAY);
-//
-//	//find circles:
-//	//Reduce the noise so we avoid false circle detection
-//	GaussianBlur(yellow_only_grayscale_mat, yellow_only_grayscale_mat, Size(9, 9), 2, 2);
-//	//Apply Hough:
-//	HoughCircles(yellow_only_grayscale_mat, new_frame_data.circles, HOUGH_GRADIENT,
-//		2,   // accumulator resolution (size of the image / 2)
-//		5,  // minimum distance between two circles
-//		100, // Canny high threshold
-//		100, // minimum number of votes
-//		0, 1000); // min and max radius
-//
-//
-//	//distinguish between stickers:
-//	if (new_frame_data.circles.size < 4) //no circles found
-//		// TODO: Cleanup
-//		return;
-//	new_frame_data.UpdateStickersLoactions();
-//
-//	//calculate distances:
-//	new_frame_data.CalculateDistances2D();
-//	new_frame_data.color_timestamp = color_timestamp;
-//	//add timestamp:
-//	breathing_frame_data_vec->push_back(new_frame_data);
-//}
 
 FrameManager::FrameManager(Config* cfg, unsigned int n_frames, const char * frame_disk_path) :
 	_n_frames(n_frames), _frame_disk_path(frame_disk_path), _oldest_frame_index(0), user_cfg(cfg), interval_active(false)
@@ -327,9 +188,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 		logFile << interval_text;
 	}
 	*/
-	add_frame_data(breathing_data);
-	
-	
+	add_frame_data(breathing_data);	
 }
 
 void FrameManager::cleanup()

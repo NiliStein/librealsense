@@ -87,7 +87,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
-		if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); //&&&&&&&&&
+		if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); 
 		
 			if (show_camera_stream && !run_on_existing_file) {
 			
@@ -217,7 +217,6 @@ int main(int argc, char * argv[]) try
 
 			// align all frames to color viewport
 			fs = align_to_color.process(fs);
-
 			// with the aligned frameset we proceed as usual
 			auto depth = fs.get_depth_frame();
 			auto color = fs.get_color_frame();
