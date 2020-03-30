@@ -87,7 +87,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
-		if (user_cfg.mode == graph_mode::DISTANCES) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm); 
+		if (user_cfg.mode == graph_mode::DISTANCES || user_cfg.mode == graph_mode::FOURIER) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm);
 		
 			if (show_camera_stream && !run_on_existing_file) {
 			
@@ -260,8 +260,6 @@ int main(int argc, char * argv[]) try
 			if (user_cfg.mode == graph_mode::LOCATION) {
 				graph.plotLoc(frame_manager);
 			}
-			//if (frame_manager.get_frames_array_size() > 10) graph.plotBPM(frame_manager);
-			//TODO: plot frequencies
 			
 			glColor4f(1.f, 1.f, 1.f, 1.f);
 			glDisable(GL_BLEND);

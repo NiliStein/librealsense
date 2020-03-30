@@ -17,11 +17,11 @@
 #define COORDINATES_TO_STRING_CM(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
 #define COORDINATES_TO_STRING_PIXELS(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]))
 
+
 #define NUM_OF_STICKERS 5
 #define CALC_2D_BY_CM false //if false, calculate by pixels
-#define PI 3.14159265358979323846
-//TODO: for logging
-std::ofstream logFile("log.txt");
+
+
 
 /* Compare functions to sort the stickers: */
 
@@ -58,10 +58,13 @@ FrameManager::~FrameManager()
 }
 
 void FrameManager::restart() {
+	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	frame_idx = 1;
+	first_timestamp = NULL;
+	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	_oldest_frame_index = 0;
 	interval_active = false;
 	manager_start_time = clock();
-	_frame_data_arr = new BreathingFrameData*[_n_frames];
 	for (unsigned int i = 0; i < _n_frames; i++) {
 		_frame_data_arr[i] = NULL;
 	}
@@ -163,13 +166,13 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	get_3d_coordinates(depth_frame, float((*breathing_data->mid3)[0]), (*breathing_data->mid3)[1], breathing_data->mid3_cm);
 
 	//calculate 2D distances:
-	breathing_data->CalculateDistances2D();
-
-	//add color timestamp:
-	breathing_data->color_timestamp = color_frame.get_timestamp();
+	breathing_data->CalculateDistances2D(user_cfg);
 
 	//calculate 3D distances:
-	breathing_data->CalculateDistances3D();
+	breathing_data->CalculateDistances3D(user_cfg);
+
+	//add color timestamp:
+	breathing_data->color_timestamp = color_frame.get_timestamp();	
 	
 	//add depth timestamp:
 	breathing_data->depth_timestamp = depth_frame.get_timestamp();
@@ -178,8 +181,19 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	clock_t current_system_time = clock();
 	breathing_data->system_timestamp = (current_system_time - manager_start_time) / double(CLOCKS_PER_SEC); //time in seconds elapsed since frame manager created
 
+	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	if (!first_timestamp) first_timestamp = (breathing_data->color_timestamp < breathing_data->depth_timestamp) ? breathing_data->color_timestamp : breathing_data->depth_timestamp;
+	breathing_data->frame_idx = frame_idx; // is this a counter we should create? or an index exttracted from the device?
+	frame_idx++;
+	breathing_data->color_idx = color_frame.get_frame_number();
+	breathing_data->depth_idx = depth_frame.get_frame_number();
+	breathing_data->system_color_timestamp = (breathing_data->color_timestamp - first_timestamp) / double(CLOCKS_PER_SEC); //time elapsed from first timestamp in video - which timestamp?
+	breathing_data->system_depth_timestamp = (breathing_data->depth_timestamp - first_timestamp) / double(CLOCKS_PER_SEC);
+	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
 	//TODO: for logging
-	logFile << breathing_data->GetDescription();
+	//logFile << breathing_data->GetDescription();	//&&&&&&&&&&&&&&&
+	breathing_data->GetDescription_temp();
 
 	/*
 	//TODO: for debugging:
@@ -188,7 +202,28 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 		logFile << interval_text;
 	}
 	*/
-	add_frame_data(breathing_data);	
+	//check if frame id duplicated
+	bool is_dup = false;
+	int last_frame_index = (_n_frames + _oldest_frame_index - 1) % _n_frames;
+	if (_frame_data_arr[last_frame_index] != NULL) {
+		if (user_cfg->dimension == dimension::D2) {
+			if (_frame_data_arr[last_frame_index]->color_timestamp == breathing_data->color_timestamp
+				&& _frame_data_arr[last_frame_index]->average_2d_dist == breathing_data->average_2d_dist) {
+				is_dup = true;
+			}
+		}
+		if (user_cfg->dimension == dimension::D3) {
+			if (_frame_data_arr[last_frame_index]->color_timestamp == breathing_data->color_timestamp
+				&& _frame_data_arr[last_frame_index]->depth_timestamp == breathing_data->depth_timestamp
+				&& _frame_data_arr[last_frame_index]->average_3d_dist == breathing_data->average_3d_dist) {
+				is_dup = true;
+			}
+		}
+		
+
+	}
+	if (!is_dup) add_frame_data(breathing_data);
+	
 }
 
 void FrameManager::cleanup()
@@ -247,145 +282,11 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 	for (unsigned int i = 0; i < _n_frames; i++) {
 		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_dists is run after add_frame_data (after _oldest_frame_idx++)
 		if (_frame_data_arr[idx] != NULL) {
-			//check if frame was received in under 15 sec
-			double avg_dist = 0.0;
-			int c = 0;
+			double avg_dist = (user_cfg->dimension == dimension::D2) ? _frame_data_arr[idx]->average_2d_dist : _frame_data_arr[idx]->average_3d_dist;
 			double t = _frame_data_arr[idx]->system_timestamp; 
-			for (std::pair<distances, bool> dist_elem : user_cfg->dists_included) {
-				distances dist = dist_elem.first;
-				bool is_included = dist_elem.second;
-				if (is_included) { //if distance is included in user_cfg
-					std::map<distances, float*>* distances_map = (user_cfg->dimension == dimension::D2) ? &_frame_data_arr[idx]->distances_map_2d : &_frame_data_arr[idx]->distances_map_3d;
-					avg_dist += *((*distances_map)[dist]);
-					c += 1;
-				}
-			}
-				
-			avg_dist = avg_dist / (1.0*c);
 			out->push_back(cv::Point2d(t, avg_dist));
 		}
 	}
-}
-
-// assuming dists and time are ordered according to time (oldest fisrt)
-long double FrameManager::cal_frequency_dft(std::vector<cv::Point2d>* samples) {
-	
-	int N = samples->size();	// N - number of samples (frames)
-	
-	double t0 = samples->at(0).x;	// t0, t1 - start, end time(seconds)
-	double t1 = samples->at(N-1).x;
-	
-	int fps = N / (t1 - t0);	// FPS - frames per second
-	// t - vector of time signatures
-		// note: t = [t0    t0+(t1-t0/win_size-1)    t0+(t1-t0/win_size-1)*2    t0+(t1-t0/win_size-1)*3 ...... t1];
-	//std::vector<double> t;
-	//linespace(t0, t1, N, &t);
-
-	/*
-	// vector of frequency signatures
-	// note: frequency is  a vector of(N / 2) evenly spaced points between 0 and FPS / 2.
-	std::vector<double> frequencies;
-	linespace(0, fps / 2, N / 2, &frequencies);
-	*/
-	//std::vector<double> coef;
-	
-	double C = 2 * PI / N;
-	int max_idx = 0;
-	double max_val = 0;
-	int mink = (4.0 / 60.0)*((N - 2.0) / fps);	// assume BPM >= 4
-	//calculate real part of coefficients
-	for (int k = mink; k <= N / 2; k++) {	//frequency 0 always most dominant. ignore first coef.
-		double coef_re = 0.0;
-		double coef_im = 0.0;
-		for (int n = 0; n < N; n++) {
-			coef_re += samples->at(n).y * cos(C*k*n);
-			coef_im += samples->at(n).y * sin(C*k*n);
-		}
-		double abs_val = coef_re * coef_re + coef_im * coef_im;
-		if (abs_val > max_val) {
-			max_val = abs_val;
-			max_idx = k;
-		}
-	}
-	
-	float f = fps / (N - 2.0) * max_idx;
-	logFile << "method get_frequency (dft):\n";
-	logFile << "\nfrequency = fps / (N - 2.0) * max_idx: " << fps << " / (" << N << " - 2.0) * " << max_idx <<  " = " << f << '\n';
-
-	return f;
-}
-
-long double FrameManager::calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_frequencies) {
-	
-	int realSamplesNum = samples->size();	// N - number of samples (frames)
-	//const int paddedSamplesNum = 512;	// fft works requires that the number of samples is a power of 2 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-	const int paddedSamplesNum = 256;	// fft works requires that the number of samples is a power of 2
-	int dir = 1;
-	long m = log2(paddedSamplesNum);
-	double X[paddedSamplesNum] = { 0 };
-	for (int s = 0; s < realSamplesNum; s++) { // insert real samples in first #realSamplesNum slots
-		X[s] = samples->at(s).y;
-	}
-	double Y[paddedSamplesNum] = { 0 };	// no imaginary part in samples
-	double t0 = samples->at(0).x;	// t0, t1 - start, end time(seconds)
-	double t1 = samples->at(realSamplesNum - 1).x;
-	int fps = realSamplesNum / (t1 - t0);	// FPS - frames per second
-	
-	FFT(dir, m, X, Y);
-	
-	/*const int top = 100;
-	int top_max_idx[top] = { 0 };
-	double min_bpm = 7.0;
-	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
-	for (int j = 0; j < top; j++) {
-		int max_idx = 0;
-		double max_val = 0;
-		for (int i = mini; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
-			double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);
-			if (val > max_val) {
-				max_val = val;
-				max_idx = i;
-			}
-		}
-		top_max_idx[j] = max_idx;
-		X[max_idx] = 0;
-	}
-	double avg_max_idx = 0;
-	for (int i = 0; i < top; i++)  avg_max_idx += top_max_idx[i];
-	avg_max_idx /= top;
-	logFile << "method get_frequency_fft:\n";
-	logFile << "fps: " << fps << '\n';
-	logFile << "realSamplesNum: " << realSamplesNum << '\n';
-	long double f = fps / (paddedSamplesNum - 2.0) * top_max_idx[0];
-	long double f_avg = fps / (paddedSamplesNum - 2.0) * avg_max_idx;
-	logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << top_max_idx[0] << " = " << f << '\n';
-	logFile << "frequency avg of two = fps / (paddedSamplesNum - 2.0) * avg_max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << avg_max_idx << "  = " << f_avg << '\n';
-	logFile << "    Frequency: " << f << "     BPM: " << 60.0*f << "\n";
-	logFile << "avg Frequency: " << f_avg << " avg BPM: " << 60.0*f_avg << "\n";
-	*/
-	
-	int max_idx = 0;
-	double max_val = 0;
-	double min_bpm = 6.0;	// TODO: decide minimal BPM
-	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
-	for (int i = 0; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
-		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);
-		if (out_frequencies != NULL) {
-			double frequency = fps / (paddedSamplesNum - 2.0) * i;
-			out_frequencies->push_back(cv::Point2d(frequency, val));
-		}
-		if(i >= mini && val > max_val) {
-			max_val = val;
-			max_idx = i;
-		}
-	}
-	logFile << "method get_frequency_fft:\n";
-	logFile << "fps: " << fps << '\n';
-	logFile << "realSamplesNum: " << realSamplesNum << '\n';
-	long double f = fps / (paddedSamplesNum - 2.0) * max_idx;
-	logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << max_idx << " = " << f << '\n';
-
-	return f;
 }
 
 void FrameManager::activateInterval() {
@@ -427,7 +328,7 @@ void BreathingFrameData::UpdateStickersLoactions()
 	
 }
 
-void BreathingFrameData::CalculateDistances2D()
+void BreathingFrameData::CalculateDistances2D(Config* user_cfg)
 {
 	if (!left || !right || !mid2 || !mid3) return;
 	if (NUM_OF_STICKERS == 5 && !mid1) return;
@@ -462,18 +363,23 @@ void BreathingFrameData::CalculateDistances2D()
 	}
 	
 	//calculate average:
-	if (NUM_OF_STICKERS == 5) {
-		average_2d_dist = (dLM1 + dLM2 + dLM3 + dLR + dRM1 + dRM2 + dRM3 + dM1M2 + dM1M3 + dM2M3) / 10;
-	}
-	else {
-		average_2d_dist = (dLM2 + dLM3 + dLR + dRM2 + dRM3 + dM2M3) / 6;
+	average_2d_dist = 0.0;
+	int c = 0;
+	for (std::pair<distances, bool> dist_elem : user_cfg->dists_included) {
+		distances dist = dist_elem.first;
+		bool is_included = dist_elem.second;
+		if (is_included) { //if distance is included in user_cfg
+			average_2d_dist += *(distances_map_2d[dist]);
+			c += 1;
+		}
 	}
 
+		average_2d_dist = average_2d_dist / (1.0*c);
 }
 
 
 
-void BreathingFrameData::CalculateDistances3D()
+void BreathingFrameData::CalculateDistances3D(Config* user_cfg)
 {
 	if (!left || !right || !mid2 || !mid3) return;
 	if (NUM_OF_STICKERS == 5 && !mid1) return;
@@ -493,22 +399,32 @@ void BreathingFrameData::CalculateDistances3D()
 	}
 
 	//calculate average:
-	if (NUM_OF_STICKERS == 5) {
-		average_3d_dist = (dLM1_depth + dLM2_depth + dLM3_depth + dLR_depth + dRM1_depth + dRM2_depth + dRM3_depth + dM1M2_depth + dM1M3_depth + dM2M3_depth) / 10;
-	}
-	else {
-		average_3d_dist = (dLM2_depth + dLM3_depth + dLR_depth + dRM2_depth + dRM3_depth + dM2M3_depth) / 6;
+	average_3d_dist = 0.0;
+	int c = 0;
+	for (std::pair<distances, bool> dist_elem : user_cfg->dists_included) {
+		distances dist = dist_elem.first;
+		bool is_included = dist_elem.second;
+		if (is_included) { //if distance is included in user_cfg
+			average_3d_dist += *(distances_map_3d[dist]);
+			c += 1;
+		}
 	}
 
+	average_3d_dist = average_3d_dist / (1.0*c);
 }
 
 std::string BreathingFrameData::GetDescription() 
 {
 	const std::string d2method = (CALC_2D_BY_CM) ? "cm" : "pixels";
-	std::string desc = "#################################################\nColor timestamp: " + std::to_string(color_timestamp) +
+	std::string desc = "#################################################\nFrame idx: " + std::to_string(frame_idx);
+	desc += "\nColor idx : " + std::to_string(color_idx);
+	desc += "\nDepth idx : " + std::to_string(depth_idx);
+	desc += "\nColor timestamp: " + std::to_string(color_timestamp) +
 		"\nDepth timestamp: " + std::to_string(depth_timestamp) +
-		"\nSystem timestamp: " + std::to_string(system_timestamp) +
-		"\nCoordinates cm:\n" +
+		//"\nSystem timestamp: " + std::to_string(system_timestamp) + &&&
+		"\nSystem color timestamp: " + std::to_string(system_color_timestamp) +
+		"\nSystem depth timestamp: " + std::to_string(system_depth_timestamp) +
+		"\nCoordinates cm:\n" + 
 		"left: " + COORDINATES_TO_STRING_CM((&left_cm)) +
 		"\nright: " + COORDINATES_TO_STRING_CM((&right_cm));
 	if (NUM_OF_STICKERS == 5) desc += "\nmid1: " + COORDINATES_TO_STRING_CM((&mid1_cm));
@@ -548,9 +464,65 @@ std::string BreathingFrameData::GetDescription()
 			"\nmid1-mid3: " + std::to_string(dM1M3_depth);
 	}
 	desc += "\nmid2-mid3: " + std::to_string(dM2M3_depth) +
-		"\n2D average distance: " + std::to_string(average_2d_dist) + " " + d2method +
-		"\n3D average distance: " + std::to_string(average_3d_dist) + " cm\n";
+		"\n2D average distance: " + std::to_string(average_2d_dist) + //" " + d2method +	&&&
+		//"\n3D average distance: " + std::to_string(average_3d_dist) + " cm\n";	&&&
+		"\n3D average distance: " + std::to_string(average_3d_dist) + "\n";	 //	&&&
 	return desc;
+}
+
+void BreathingFrameData::GetDescription_temp()
+{
+	const std::string d2method = (CALC_2D_BY_CM) ? "cm" : "pixels";
+
+	logFile << "#################################################\nFrame idx: " << std::to_string(frame_idx);
+	logFile << "\nColor idx : " << std::to_string(color_idx);
+	logFile << "\nDepth idx : " + std::to_string(depth_idx);
+	logFile << "\nColor timestamp: " + std::to_string(color_timestamp) <<
+		"\nDepth timestamp: " << std::to_string(depth_timestamp) <<
+		//"\nSystem timestamp: " + std::to_string(system_timestamp) + &&&
+		"\nSystem color timestamp: " << std::to_string(system_color_timestamp) <<
+		"\nSystem depth timestamp: " << std::to_string(system_depth_timestamp) <<
+		"\nCoordinates cm:\n" << "left: " << std::fixed << std::setprecision(2) << left_cm[0] << " " << std::fixed << std::setprecision(2) << left_cm[1] << " " << std::fixed << std::setprecision(2) << left_cm[2];
+	logFile <<  "\nright: " << std::fixed << std::setprecision(2) << right_cm[0] << " " << std::fixed << std::setprecision(2) << right_cm[1] << " " << std::fixed << std::setprecision(2) << right_cm[2];
+	if (NUM_OF_STICKERS == 5) logFile << "\nmid1: " << std::fixed << std::setprecision(2) << mid1_cm[0] << " " << std::fixed << std::setprecision(2) << mid1_cm[1] << " " << std::fixed << std::setprecision(2) << mid1_cm[2];
+	logFile << "\nmid2: " << std::fixed << std::setprecision(2) << mid2_cm[0] << " " << std::fixed << std::setprecision(2) << mid2_cm[1] << " " << std::fixed << std::setprecision(2) << mid2_cm[2];
+	logFile <<	"\nmid3: " << std::fixed << std::setprecision(2) << mid3_cm[0] << " " << std::fixed << std::setprecision(2) << mid3_cm[1] << " " << std::fixed << std::setprecision(2) << mid3_cm[2];
+	logFile <<	"\nCoordinates pixels:\n" <<
+		"left: " <<std::fixed << std::setprecision(2) << (*left)[0] << " " << std::fixed << std::setprecision(2) << (*left)[1] <<
+		"\nright: " << std::setprecision(2) << (*right)[0] << " " << std::setprecision(2) << (*right)[1];
+	if (NUM_OF_STICKERS == 5) logFile << "\nmid1: " << std::fixed << std::setprecision(2) << (*mid1)[0] << " " << std::fixed << std::setprecision(2) << (*mid1)[1];
+	logFile << "\nmid2: " << std::fixed << std::setprecision(2) << (*mid2)[0] << " " << std::fixed << std::setprecision(2) << (*mid2)[1];
+	logFile << "\nmid3: " << std::fixed << std::setprecision(2) << (*mid3)[0] << " " << std::fixed << std::setprecision(2) << (*mid3)[1];
+	logFile <<"\n2D distances (" << d2method << "):";
+
+	if (NUM_OF_STICKERS == 5)  logFile << "\nleft-mid1: " << std::fixed << std::setprecision(2) << dLM1;
+	logFile << "\nleft-mid2: " << std::fixed << std::setprecision(2) << dLM2 <<
+		"\nleft-mid3: " << std::fixed << std::setprecision(2) << dLM3 <<
+		"\nleft-right: " << std::fixed << std::setprecision(2) << dLR;
+	if (NUM_OF_STICKERS == 5)  logFile << "\nright-mid1: " << std::fixed << std::setprecision(2) << dRM1;
+	logFile << "\nright-mid2: " << std::fixed << std::setprecision(2) << dRM2 <<
+		"\nright-mid3: " << std::fixed << std::setprecision(2) << dRM3;
+	if (NUM_OF_STICKERS == 5) {
+		logFile << "\nmid1-mid2: " << std::fixed << std::setprecision(2) << dM1M2 <<
+			"\nmid1-mid3: " << std::fixed << std::setprecision(2) << dM1M3;
+	}
+	logFile << "\nmid2-mid3: " << std::fixed << std::setprecision(2) << dM2M3 <<
+		"\n3D distances:";
+
+	if (NUM_OF_STICKERS == 5)  logFile << "\nleft-mid1: " << std::fixed << std::setprecision(2) << dLM1_depth;
+	logFile << "\nleft-mid2: " << std::fixed << std::setprecision(2) << dLM2_depth <<
+		"\nleft-mid3: " << std::fixed << std::setprecision(2) << dLM3_depth <<
+		"\nleft-right: " << std::fixed << std::setprecision(2) << dLR_depth;
+	if (NUM_OF_STICKERS == 5)  logFile << "\nright-mid1: " << std::fixed << std::setprecision(2) << dRM1_depth;
+	logFile << "\nright-mid2: " << std::fixed << std::setprecision(2) << dRM2_depth <<
+		"\nright-mid3: " << std::setprecision(2) << dRM3_depth;
+	if (NUM_OF_STICKERS == 5) {
+		logFile << "\nmid1-mid2: " << std::fixed << std::setprecision(2) << dM1M2_depth <<
+			"\nmid1-mid3: " << std::fixed << std::setprecision(2) << dM1M3_depth;
+	}
+	logFile << "\nmid2-mid3: " << std::fixed << std::setprecision(2) << dM2M3_depth <<
+		"\n2D average distance: " << std::fixed << std::setprecision(6) << average_2d_dist <<
+		"\n3D average distance: " << std::fixed << std::setprecision(6) << average_3d_dist << "\n";	 //	&&&
 }
 
 
@@ -647,7 +619,7 @@ long double GraphPlot::updatePlotFourier(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> dist_points;
 	std::vector<cv::Point2d> frequency_points;
 	frame_manager.get_dists(&dist_points);
-	long double f = (frame_manager.calc_frequency_fft(&dist_points, &frequency_points));
+	long double f = (calc_frequency_fft(&dist_points, &frequency_points));
 	axes = CvPlot::makePlotAxes();
 	axes.setXLim(std::pair<double, double>(Fx_LOWER_BOUND, Fx_UPPER_BOUND));
 	axes.setYLim(std::pair<double, double>(Fy_LOWER_BOUND, Fy_UPPER_BOUND));
@@ -682,9 +654,9 @@ void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
 
 long double GraphPlot::plotDists(FrameManager& frame_manager) {
 	if (first) {
-		window = new CvPlot::Window("Distances", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND));
-		axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND));
+		//window = new CvPlot::Window("Distances", axes, 600, 800);
+		//axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND)); &&&&&&&&
+		//axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND)); &&&&&&&&
 		first = false;
 	}
 	return updatePlotDists(frame_manager);
@@ -693,10 +665,12 @@ long double GraphPlot::plotDists(FrameManager& frame_manager) {
 long double GraphPlot::updatePlotDists(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> points;
 	frame_manager.get_dists(&points);
-	long double f = (frame_manager.calc_frequency_fft(&points));
-	//axes = CvPlot::makePlotAxes();
-	axes.create<CvPlot::Series>(points, "-b");
-	window->update();
+	//long double f = (calc_frequency_fft(&points));	//&&&&&&&&&&&	03292020
+	bool cm_units = (frame_manager.user_cfg->dimension==dimension::D3) ? true : CALC_2D_BY_CM;
+	long double f = calc_frequency_differently(&points, cm_units);
+	//axes = CvPlot::makePlotAxes(); &&&&&&&
+	//axes.create<CvPlot::Series>(points, "-b"); &&&&&&&&&
+	//window->update();
 	return f;
 }
 /* OLD FUNCTIONS: */

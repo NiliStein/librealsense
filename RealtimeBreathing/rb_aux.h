@@ -102,7 +102,10 @@ public:
 	double color_timestamp;
 	double depth_timestamp;
 	double system_timestamp;
-
+	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	unsigned long long frame_idx, color_idx, depth_idx;
+	double system_color_timestamp, system_depth_timestamp;
+	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	//ctor:
 	BreathingFrameData() :
 		left(NULL), right(NULL), mid1(NULL), mid2(NULL), mid3(NULL),
@@ -126,13 +129,15 @@ public:
 	void UpdateStickersLoactions();
 
 	/* Calculates 2D distances between all stickers and their average. */
-	void CalculateDistances2D();
+	void CalculateDistances2D(Config* user_cfg);
 	/* Calculates 3D distances between all stickers and their average. */
-	void CalculateDistances3D();
+	void CalculateDistances3D(Config* user_cfg);
 
 	/* Gets the description of the frame in the following format:
 		TODO: update format */
 	std::string GetDescription();
+	void GetDescription_temp();
+	/* for a log with precision 2*/
 };
 
 
@@ -182,13 +187,7 @@ public:
 	* if called in L mode, no points are pushed to vector out
 	*/
 	void get_dists(std::vector<cv::Point2d> *out);
-	/**
-	* To be used in D mode
-	* returns most dominant frequency, calculated for average distance in frames received in the last 15 seconds
-	* the avg distance is calculated only for distances set to true in user_cfg.dists_included
-	*/
-	long double cal_frequency_dft(std::vector<cv::Point2d>* samples);
-	long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_frequencies = NULL);
+
 	
 
 
@@ -203,7 +202,10 @@ private:
 	 * NOTE: only last n_frames saved so the oldest frame_data will be deleted 
 	 */
 	void add_frame_data(BreathingFrameData * frame_data);
-
+	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	int frame_idx = 1;
+	double first_timestamp = NULL;
+	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	unsigned int _n_frames;
 	unsigned int _oldest_frame_index;
 	BreathingFrameData** _frame_data_arr;
