@@ -307,6 +307,7 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 long double FrameManager::no_graph() {
 	std::vector<cv::Point2d> points;
 	get_dists(&points);
+	
 	long double f;
 	if (GET_FREQUENCY_BY_FFT) {
 		normalize_distances(&points);
@@ -316,6 +317,8 @@ long double FrameManager::no_graph() {
 		bool cm_units = (user_cfg->dimension == dimension::D3) ? true : CALC_2D_BY_CM;
 		f = calc_frequency_differently(&points, cm_units);
 	}
+
+	
 	return f;
 }
 

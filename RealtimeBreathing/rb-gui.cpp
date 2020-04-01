@@ -193,7 +193,6 @@ int main(int argc, char * argv[]) try
 			}
 
 			// using the align object, we block the application until a frameset is available
-			//rs2::frameset fs = pipe.wait_for_frames(); &&&&&&&&&&&&&&&&&&&&&
 			rs2::frameset fs;
 			if (run_on_existing_file && !RUN_FROM_FILE_ON_REPEAT) {
 				if (!pipe.try_wait_for_frames(&fs, 10000)) {

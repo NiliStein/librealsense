@@ -31,6 +31,14 @@ static float distance3D(float x, float y, float z, float a, float b, float c) {
 //TODO: gives same results as get_3d_coordinates. more complicated. remove.
 void get_3d_coordinates_2(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
 	float pixel[2] = { x, y };
+	
+	/*
+	rs2::pointcloud pc;
+	rs2::points points = pc.calculate(depth_frame);
+	*/
+	
+	
+	
 	float depth_pixel[2];
 	float point[3]; // From point (in 3D)
 	auto dist = depth_frame.get_distance(pixel[0], pixel[1]);
@@ -221,14 +229,24 @@ long double calc_frequency_dft(std::vector<cv::Point2d>* samples) {
 long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_frequencies = NULL) {
 	if (samples->size() < 2) return 0;
 	int realSamplesNum = samples->size();	// N - number of samples (frames)
-	const int paddedSamplesNum = 256;	// fft works requires that the number of samples is a power of 2
+	int realSamplesLog = log2(realSamplesNum);
+	// fft requires that the number of samples is a power of 2. add padding if needed
+	const int paddedSamplesNum = (realSamplesNum == pow(2, realSamplesLog)) ? realSamplesNum : pow(2, realSamplesLog + 1);	
 	int dir = 1;
 	long m = log2(paddedSamplesNum);
-	double X[paddedSamplesNum] = { 0 };
-	for (int s = 0; s < realSamplesNum; s++) { // insert real samples in first #realSamplesNum slots
+	double* X = new double[paddedSamplesNum];
+	double* Y = new double[paddedSamplesNum];
+	// insert real samples in first #realSamplesNum slots
+	for (int s = 0; s < realSamplesNum; s++) { 
 		X[s] = samples->at(s).y;
+		Y[s] = 0;	// no imaginary part in samples
 	}
-	double Y[paddedSamplesNum] = { 0 };	// no imaginary part in samples
+	// add padding after real samples
+	for (int s = realSamplesNum; s < paddedSamplesNum; s++) { 
+		X[s] = 0;
+		Y[s] = 0;
+	}
+	
 	double t0 = samples->at(0).x;	// t0, t1 - start, end time(seconds)
 	double t1 = samples->at(realSamplesNum - 1).x;
 	if (t1 == t0) return 0;
@@ -274,7 +292,7 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 
 	int max_idx = 0;
 	double max_val = 0;
-	double min_bpm = 6.0;	// TODO: decide minimal BPM
+	double min_bpm = 5.0;	// TODO: decide minimal BPM
 	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
 	for (int i = 0; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
 		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);	
@@ -289,7 +307,10 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 			max_idx = i;
 		}
 	}
-	//logFile << "method get_frequency_fft:\n";
+
+	delete X;
+	delete Y;
+	
 	logFile << "fps: " << fps << '\n';
 	logFile << "realSamplesNum: " << realSamplesNum << '\n';
 	long double f = fps / (paddedSamplesNum - 2.0) * max_idx;
