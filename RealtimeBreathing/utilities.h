@@ -28,17 +28,56 @@ static float distance3D(float x, float y, float z, float a, float b, float c) {
 	return sqrt(pow(x - a, 2) + pow(y - b, 2) + pow(z - c, 2));
 }
 
-void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
+//TODO: gives same results as get_3d_coordinates. more complicated. remove.
+void get_3d_coordinates_2(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
+	float pixel[2] = { x, y };
+	float depth_pixel[2];
+	float point[3]; // From point (in 3D)
+	auto dist = depth_frame.get_distance(pixel[0], pixel[1]);
+	rs2_intrinsics depth_intr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
+	rs2_intrinsics color_intr = color_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
+	rs2_extrinsics depth_to_color_extr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_extrinsics_to(color_frame.get_profile().as<rs2::video_stream_profile>());
+	rs2_extrinsics color_to_depth_extr = color_frame.get_profile().as<rs2::video_stream_profile>().get_extrinsics_to(depth_frame.get_profile().as<rs2::video_stream_profile>());
+	//get depth pixel
+	rs2_project_color_pixel_to_depth_pixel(depth_pixel, reinterpret_cast<const uint16_t*>(depth_frame.get_data()), 0.001, 0.1, 10, &depth_intr, &color_intr, &color_to_depth_extr, &depth_to_color_extr, pixel);
+	
+	rs2_deproject_pixel_to_point(point, &depth_intr, depth_pixel, dist);
 
+	//convert to cm
+	output[0] = float(point[0]) * 100.0;
+	output[1] = float(point[1]) * 100.0;
+	output[2] = float(point[2]) * 100.0;
+
+}
+void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
 	float pixel[2] = { x, y };
 	float point[3]; // From point (in 3D)
 	auto dist = depth_frame.get_distance(pixel[0], pixel[1]);
-	rs2_intrinsics intr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
-	rs2_deproject_pixel_to_point(point, &intr, pixel, dist);
 
-	output[0] = float(point[0]) * 100.0;//convert to cm
+	rs2_intrinsics depth_intr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
+
+	rs2_deproject_pixel_to_point(point, &depth_intr, pixel, dist);
+
+	//convert to cm
+	output[0] = float(point[0]) * 100.0;
 	output[1] = float(point[1]) * 100.0;
 	output[2] = float(point[2]) * 100.0;
+
+}
+
+
+bool check_illegal_3D_coordinates(const BreathingFrameData* breathing_data) {
+	bool illegal_3d_coordinates = false;
+	//check for 0,-0,0 3d coordinates. dump such frames
+	for (std::pair<stickers, cv::Vec3f*> sticker_elem : breathing_data->stickers_map_cm) {
+		stickers s = sticker_elem.first;
+		cv::Vec3f* d3_coor = sticker_elem.second;
+		if ((*d3_coor)[0] == 0.0 && (*d3_coor)[1] == -0 && (*d3_coor)[2] == 0) {
+			illegal_3d_coordinates = true;
+			break;
+		}
+	}
+	return illegal_3d_coordinates;
 }
 
 
@@ -180,9 +219,8 @@ long double calc_frequency_dft(std::vector<cv::Point2d>* samples) {
 * the avg distance is calculated only for distances set to true in user_cfg.dists_included
 */
 long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_frequencies = NULL) {
-	
+	if (samples->size() < 2) return 0;
 	int realSamplesNum = samples->size();	// N - number of samples (frames)
-	//const int paddedSamplesNum = 512;	// fft works requires that the number of samples is a power of 2 &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	const int paddedSamplesNum = 256;	// fft works requires that the number of samples is a power of 2
 	int dir = 1;
 	long m = log2(paddedSamplesNum);
@@ -193,15 +231,15 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 	double Y[paddedSamplesNum] = { 0 };	// no imaginary part in samples
 	double t0 = samples->at(0).x;	// t0, t1 - start, end time(seconds)
 	double t1 = samples->at(realSamplesNum - 1).x;
-	//int fps = realSamplesNum / (t1 - t0);	// FPS - frames per second&&&&&&&&&&&&&&&&&&
+	if (t1 == t0) return 0;
 	double fps = realSamplesNum / (t1 - t0);	// FPS - frames per second
 
-	double dt = (t1 - t0) / realSamplesNum;	// time delta between two samples
-	double fc = fps / 2;	// cutoff frequency
-	double X_LPF[paddedSamplesNum] = { 0 };
-	LPF(X, dt, fc, X_LPF, realSamplesNum);
+	//double dt = (t1 - t0) / realSamplesNum;	// time delta between two samples
+	//double fc = fps / 2;	// cutoff frequency
+	//double X_LPF[paddedSamplesNum] = { 0 };
+	//LPF(X, dt, fc, X_LPF, realSamplesNum);
 
-	FFT(dir, m, X_LPF, Y);
+	FFT(dir, m, X, Y);
 
 	/*const int top = 100;
 	int top_max_idx[top] = { 0 };
@@ -239,11 +277,12 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 	double min_bpm = 6.0;	// TODO: decide minimal BPM
 	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
 	for (int i = 0; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
-		//double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);	//&&&&&&&&&
-		double val = abs(X_LPF[i])*abs(X_LPF[i]) + abs(Y[i])*abs(Y[i]);	//&&&&&&&&&
+		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);	
+		//double val = abs(X[i]);	//&&&&&&&&&TODO: choose method
 		if (out_frequencies != NULL) {
 			double frequency = fps / (paddedSamplesNum - 2.0) * i;
-			out_frequencies->push_back(cv::Point2d(frequency, val));
+			out_frequencies->push_back(cv::Point2d(frequency, abs(X[i])));
+			//out_frequencies->push_back(cv::Point2d(frequency, val));
 		}
 		if (i >= mini && val > max_val) {
 			max_val = val;
@@ -254,7 +293,7 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 	logFile << "fps: " << fps << '\n';
 	logFile << "realSamplesNum: " << realSamplesNum << '\n';
 	long double f = fps / (paddedSamplesNum - 2.0) * max_idx;
-	//logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << max_idx << " = " << f << '\n';//&&&&&&
+	//logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << max_idx << " = " << f << '\n';
 	logFile << "frequency: " <<std::fixed <<std::setprecision(6) << f;
 	logFile << "\nBPM: " << std::fixed << std::setprecision(6) << f*60.0 << '\n';
 	return f;
@@ -317,4 +356,57 @@ long double calc_frequency_differently(std::vector<cv::Point2d>* samples, bool c
 	logFile << "\nfrequncy: " << f;
 	return f;
 
+}
+
+void normalize_distances(std::vector<cv::Point2d>* samples) {
+	if (samples->size() < 3) return;
+	double max_dist = samples->at(0).y;
+	double min_dist = samples->at(0).y;
+	for (int i = 1; i < samples->size(); i++) {
+		double curr_dist = samples->at(i).y;
+		if (curr_dist > max_dist) max_dist = curr_dist;
+		if (curr_dist < min_dist) min_dist = curr_dist;
+	}
+	for (int i = 0; i < samples->size(); i++) {
+		double temp_t = samples->at(i).x;
+		double temp_d = samples->at(i).y;
+		double norm_d = 2 * (temp_d - min_dist) / (max_dist - min_dist) - 1;
+		samples->at(i) = cv::Point2d(temp_t, norm_d);
+	}
+}
+
+/*
+ *	parse samples from file in following format:
+ *	new line for each sample. samples consists of time and distance separated by space (" "). time before distance.
+ *	for exaple:
+ *	0 0.0
+ *	0.125 0.3090169943749474
+ *	0.25 0.5877852522924731
+ *	samples are normalized and inserted to given vector
+ */
+void get_samples_from_file(std::vector<cv::Point2d>* samples) {
+	std::ifstream samples_file("alons_samples.txt");
+	std::string line;
+
+	while (std::getline(samples_file, line)) {
+		std::string first = line.substr(0, line.find(" "));
+		std::string second = line.substr(line.find(" "), line.length());
+
+		double time = std::stod(first);
+		double dist = std::stod(second);
+		samples->push_back(cv::Point2d(time, dist));
+	}
+	normalize_distances(samples);
+}
+
+
+//	insert samples relevant for current window (from start_index to 250 + start_index) to out_window_samples
+void simulate_running_window(int start_index, std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_window_samples) {
+	int end_index = (start_index + 250 > samples->size()) ? samples->size() : start_index + 250;
+	for (unsigned int i = start_index; i < end_index; i++) {
+		double avg_dist = samples->at(i).y;
+		double t = samples->at(i).x;
+		out_window_samples->push_back(cv::Point2d(t, avg_dist));
+	}
+	
 }

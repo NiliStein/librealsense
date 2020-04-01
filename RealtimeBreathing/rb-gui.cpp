@@ -87,7 +87,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
-		if (user_cfg.mode == graph_mode::DISTANCES || user_cfg.mode == graph_mode::FOURIER) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm);
+		if (user_cfg.mode != graph_mode::LOCATION) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm);
 		
 			if (show_camera_stream && !run_on_existing_file) {
 			
@@ -144,9 +144,15 @@ int main(int argc, char * argv[]) try
 
 				if (!filename) {
 					filename = rs2::file_dialog_open(rs2::file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL);
-					cfg.enable_device_from_file(filename, RUN_FROM_FILE_ON_REPEAT);
-					start_time = clock();
-					pipe.start(cfg); //File will be opened in read mode at this point
+					if (filename) {
+						cfg.enable_device_from_file(filename, RUN_FROM_FILE_ON_REPEAT);
+						start_time = clock();
+						pipe.start(cfg); //File will be opened in read mode at this point
+					}
+					else { //user clicked -choose file- ans then clicked -cancel-
+						run_on_existing_file = false;
+					}
+					
 				}
 				
 			}
@@ -259,6 +265,10 @@ int main(int argc, char * argv[]) try
 			}
 			if (user_cfg.mode == graph_mode::LOCATION) {
 				graph.plotLoc(frame_manager);
+			}
+			if (user_cfg.mode == graph_mode::NOGRAPH) {
+				f = frame_manager.no_graph();
+				bpm = f * 60.0;
 			}
 			
 			glColor4f(1.f, 1.f, 1.f, 1.f);

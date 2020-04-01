@@ -19,7 +19,8 @@ enum dimension {
 enum graph_mode {
 	DISTANCES,
 	LOCATION,
-	FOURIER
+	FOURIER,
+	NOGRAPH
 };
 
 enum stickers {
@@ -102,10 +103,9 @@ public:
 	double color_timestamp;
 	double depth_timestamp;
 	double system_timestamp;
-	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	unsigned long long frame_idx, color_idx, depth_idx;
 	double system_color_timestamp, system_depth_timestamp;
-	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	
 	//ctor:
 	BreathingFrameData() :
 		left(NULL), right(NULL), mid1(NULL), mid2(NULL), mid3(NULL),
@@ -188,6 +188,13 @@ public:
 	*/
 	void get_dists(std::vector<cv::Point2d> *out);
 
+	/**
+	* To be used in N mode (for calculating frequency and BPM without generating any graphs)
+	* returns frequency calculated using get_frequency_fft if GET_FREQUENCY_BY_FFT. using get_frequency_differently otherwise.
+	* the avg distances used for crequency calculation are the  distances set to true in user_cfg.dists_included
+	*/
+	long double no_graph();
+
 	
 
 
@@ -202,15 +209,14 @@ private:
 	 * NOTE: only last n_frames saved so the oldest frame_data will be deleted 
 	 */
 	void add_frame_data(BreathingFrameData * frame_data);
-	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	int frame_idx = 1;
 	double first_timestamp = NULL;
-	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	unsigned int _n_frames;
 	unsigned int _oldest_frame_index;
 	BreathingFrameData** _frame_data_arr;
 	const char* _frame_disk_path;
 	bool interval_active;
+	int frames_dumped_in_row = 0; //reinitialized after cleanup
 };
 
 /*	GraphManager class.
@@ -220,20 +226,19 @@ private:
 */
 class GraphPlot {
 private:
+	//int running_index = 0;	//&&&&&&&&&&&&&&&&&alons doll log
+	//std::vector<cv::Point2d> alons_samples;	//&&&&&&&&&&&&&&&&&alons doll log
 	CvPlot::Window* window;
 	CvPlot::Axes axes;
 	bool first = true;
 	clock_t time_begin;
-	int Fx_LOWER_BOUND = 0, Fx_UPPER_BOUND = 10, Fy_LOWER_BOUND = 0, Fy_UPPER_BOUND = 50;
-	int Dx_LOWER_BOUND = time_begin, Dx_UPPER_BOUND = time_begin + 90, Dy_LOWER_BOUND = 30, Dy_UPPER_BOUND = 500;
-	int Lx_LOWER_BOUND = time_begin, Lx_UPPER_BOUND = time_begin + 90, Ly_LOWER_BOUND = 30, Ly_UPPER_BOUND = 100;
+	int Fx_LOWER_BOUND = 0, Fx_UPPER_BOUND = 5, Fy_LOWER_BOUND = 0, Fy_UPPER_BOUND = 4;	//graph bounds for mode FOURIER
+	int Dx_LOWER_BOUND = time_begin, Dx_UPPER_BOUND = time_begin + 90, Dy_LOWER_BOUND = 30, Dy_UPPER_BOUND = 500;	//graph bounds for mode DISTANCES
+	int Lx_LOWER_BOUND = time_begin, Lx_UPPER_BOUND = time_begin + 90, Ly_LOWER_BOUND = 30, Ly_UPPER_BOUND = 100;	//graph bounds for mode LOCATION
 	
 public:
 	//ctor:
 	GraphPlot(FrameManager& frame_manager);
-
-	//dtor:
-	~GraphPlot();
 	
 	void restart(FrameManager& frame_manager);
 

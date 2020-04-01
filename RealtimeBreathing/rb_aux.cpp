@@ -14,12 +14,13 @@
 
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
 #define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
-#define COORDINATES_TO_STRING_CM(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]) + ", " + std::to_string(circle[0][2]))
+#define COORDINATES_TO_STRING_CM(circle) (std::to_string(circle[0]) + ", " + std::to_string(circle[1]) + ", " + std::to_string(circle[2]))
 #define COORDINATES_TO_STRING_PIXELS(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]))
 
 
 #define NUM_OF_STICKERS 5
-#define CALC_2D_BY_CM false //if false, calculate by pixels
+#define CALC_2D_BY_CM false	//if false, calculate by pixels
+#define GET_FREQUENCY_BY_FFT true	//if false, use get_frequency_differently
 
 
 
@@ -58,10 +59,8 @@ FrameManager::~FrameManager()
 }
 
 void FrameManager::restart() {
-	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	frame_idx = 1;
 	first_timestamp = NULL;
-	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 	_oldest_frame_index = 0;
 	interval_active = false;
 	manager_start_time = clock();
@@ -164,7 +163,22 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	}
 	get_3d_coordinates(depth_frame, float((*breathing_data->mid2)[0]), (*breathing_data->mid2)[1], breathing_data->mid2_cm);
 	get_3d_coordinates(depth_frame, float((*breathing_data->mid3)[0]), (*breathing_data->mid3)[1], breathing_data->mid3_cm);
-
+	
+	
+	
+	
+	//if user config dimension is 3D, check for 0,-0,0 3d coordinates. dump such frames
+	if (user_cfg->dimension == dimension::D3) {
+		if (check_illegal_3D_coordinates(breathing_data)) {
+			frames_dumped_in_row++;
+			logFile << "Warning: illegal 3D coordinates! frame was dumped.\n";
+			if (frames_dumped_in_row >= 3) cleanup();
+			return;
+		}
+		else {
+			frames_dumped_in_row = 0;
+		}
+	}
 	//calculate 2D distances:
 	breathing_data->CalculateDistances2D(user_cfg);
 
@@ -181,15 +195,14 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	clock_t current_system_time = clock();
 	breathing_data->system_timestamp = (current_system_time - manager_start_time) / double(CLOCKS_PER_SEC); //time in seconds elapsed since frame manager created
 
-	//&&&&&&&&&&&&&&&&&&&&	additional data for log comparison with alon's log	&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+	
 	if (!first_timestamp) first_timestamp = (breathing_data->color_timestamp < breathing_data->depth_timestamp) ? breathing_data->color_timestamp : breathing_data->depth_timestamp;
-	breathing_data->frame_idx = frame_idx; // is this a counter we should create? or an index exttracted from the device?
+	breathing_data->frame_idx = frame_idx; 
 	frame_idx++;
 	breathing_data->color_idx = color_frame.get_frame_number();
 	breathing_data->depth_idx = depth_frame.get_frame_number();
 	breathing_data->system_color_timestamp = (breathing_data->color_timestamp - first_timestamp) / double(CLOCKS_PER_SEC); //time elapsed from first timestamp in video - which timestamp?
 	breathing_data->system_depth_timestamp = (breathing_data->depth_timestamp - first_timestamp) / double(CLOCKS_PER_SEC);
-	//&&&&&&&&&&&&&&&&&&&&		end of log comparison additional data			&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 
 	//TODO: for logging
 	//logFile << breathing_data->GetDescription();	//&&&&&&&&&&&&&&&
@@ -237,6 +250,8 @@ void FrameManager::cleanup()
 			_frame_data_arr[i] = NULL;
 		}
 	}
+	logFile << "frames array cleanup...\n";
+	frames_dumped_in_row = 0;
 }
 
 void FrameManager::add_frame_data(BreathingFrameData * frame_data)
@@ -287,6 +302,21 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 			out->push_back(cv::Point2d(t, avg_dist));
 		}
 	}
+}
+
+long double FrameManager::no_graph() {
+	std::vector<cv::Point2d> points;
+	get_dists(&points);
+	long double f;
+	if (GET_FREQUENCY_BY_FFT) {
+		normalize_distances(&points);
+		f = (calc_frequency_fft(&points));
+	}
+	else {	// get_frequency_differently
+		bool cm_units = (user_cfg->dimension == dimension::D3) ? true : CALC_2D_BY_CM;
+		f = calc_frequency_differently(&points, cm_units);
+	}
+	return f;
 }
 
 void FrameManager::activateInterval() {
@@ -421,15 +451,15 @@ std::string BreathingFrameData::GetDescription()
 	desc += "\nDepth idx : " + std::to_string(depth_idx);
 	desc += "\nColor timestamp: " + std::to_string(color_timestamp) +
 		"\nDepth timestamp: " + std::to_string(depth_timestamp) +
-		//"\nSystem timestamp: " + std::to_string(system_timestamp) + &&&
+		"\nSystem timestamp: " + std::to_string(system_timestamp) +
 		"\nSystem color timestamp: " + std::to_string(system_color_timestamp) +
 		"\nSystem depth timestamp: " + std::to_string(system_depth_timestamp) +
 		"\nCoordinates cm:\n" + 
-		"left: " + COORDINATES_TO_STRING_CM((&left_cm)) +
-		"\nright: " + COORDINATES_TO_STRING_CM((&right_cm));
-	if (NUM_OF_STICKERS == 5) desc += "\nmid1: " + COORDINATES_TO_STRING_CM((&mid1_cm));
-	desc += "\nmid2: " + COORDINATES_TO_STRING_CM((&mid2_cm)) +
-		"\nmid3: " + COORDINATES_TO_STRING_CM((&mid3_cm)) +
+		"left: " + COORDINATES_TO_STRING_CM(left_cm) +
+		"\nright: " + COORDINATES_TO_STRING_CM(right_cm);
+	if (NUM_OF_STICKERS == 5) desc += "\nmid1: " + COORDINATES_TO_STRING_CM(mid1_cm);
+	desc += "\nmid2: " + COORDINATES_TO_STRING_CM(mid2_cm) +
+		"\nmid3: " + COORDINATES_TO_STRING_CM(mid3_cm) +
 		"\nCoordinates pixels:\n" + 
 		"left: " + COORDINATES_TO_STRING_PIXELS(left) +
 		"\nright: " + COORDINATES_TO_STRING_PIXELS(right);
@@ -464,9 +494,8 @@ std::string BreathingFrameData::GetDescription()
 			"\nmid1-mid3: " + std::to_string(dM1M3_depth);
 	}
 	desc += "\nmid2-mid3: " + std::to_string(dM2M3_depth) +
-		"\n2D average distance: " + std::to_string(average_2d_dist) + //" " + d2method +	&&&
-		//"\n3D average distance: " + std::to_string(average_3d_dist) + " cm\n";	&&&
-		"\n3D average distance: " + std::to_string(average_3d_dist) + "\n";	 //	&&&
+		"\n2D average distance: " + std::to_string(average_2d_dist) + " " + d2method +	
+		"\n3D average distance: " + std::to_string(average_3d_dist) + " cm\n";		
 	return desc;
 }
 
@@ -479,7 +508,6 @@ void BreathingFrameData::GetDescription_temp()
 	logFile << "\nDepth idx : " + std::to_string(depth_idx);
 	logFile << "\nColor timestamp: " + std::to_string(color_timestamp) <<
 		"\nDepth timestamp: " << std::to_string(depth_timestamp) <<
-		//"\nSystem timestamp: " + std::to_string(system_timestamp) + &&&
 		"\nSystem color timestamp: " << std::to_string(system_color_timestamp) <<
 		"\nSystem depth timestamp: " << std::to_string(system_depth_timestamp) <<
 		"\nCoordinates cm:\n" << "left: " << std::fixed << std::setprecision(2) << left_cm[0] << " " << std::fixed << std::setprecision(2) << left_cm[1] << " " << std::fixed << std::setprecision(2) << left_cm[2];
@@ -522,7 +550,7 @@ void BreathingFrameData::GetDescription_temp()
 	}
 	logFile << "\nmid2-mid3: " << std::fixed << std::setprecision(2) << dM2M3_depth <<
 		"\n2D average distance: " << std::fixed << std::setprecision(6) << average_2d_dist <<
-		"\n3D average distance: " << std::fixed << std::setprecision(6) << average_3d_dist << "\n";	 //	&&&
+		"\n3D average distance: " << std::fixed << std::setprecision(6) << average_3d_dist << "\n";	 
 }
 
 
@@ -537,8 +565,8 @@ Config::Config(const char* config_filepath) {
 	std::getline(config_file, line); //next line is a comment
 	std::getline(config_file, line);
 	
-	if (line.compare("D") == 0 || line.compare("F") == 0) {
-		Config::mode = (line.compare("D") == 0) ? graph_mode::DISTANCES : graph_mode::FOURIER;
+	if (line.compare("D") == 0 || line.compare("F") == 0 || line.compare("N") == 0) {
+		Config::mode = (line.compare("D") == 0) ? graph_mode::DISTANCES : (line.compare("F") == 0) ? graph_mode::FOURIER : graph_mode::NOGRAPH;
 		std::getline(config_file, line); // new line
 		std::getline(config_file, line); // comment
 		// get distances to include
@@ -589,9 +617,6 @@ GraphPlot::GraphPlot(FrameManager& frame_manager) {
 	time_begin = (current_system_time - frame_manager.manager_start_time) / double(CLOCKS_PER_SEC);
 }
 
-GraphPlot::~GraphPlot() {
-	delete window;
-}
 
 void GraphPlot::restart(FrameManager& frame_manager) {
 	first = true;
@@ -610,6 +635,7 @@ long double GraphPlot::plotFourier(FrameManager& frame_manager) {
 		window = new CvPlot::Window("Fourier", axes, 600, 800);
 		axes.setXLim(std::pair<double, double>(Fx_LOWER_BOUND, Fx_UPPER_BOUND));
 		axes.setYLim(std::pair<double, double>(Fy_LOWER_BOUND, Fy_UPPER_BOUND));
+		//get_samples_from_file(&alons_samples); //&&&&&&&&&&&&&&&&&alons doll log
 		first = false;
 	}
 	return updatePlotFourier(frame_manager);
@@ -617,14 +643,20 @@ long double GraphPlot::plotFourier(FrameManager& frame_manager) {
 
 long double GraphPlot::updatePlotFourier(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> dist_points;
+	frame_manager.get_dists(&dist_points);	
+	normalize_distances(&dist_points);
 	std::vector<cv::Point2d> frequency_points;
-	frame_manager.get_dists(&dist_points);
+	//simulate_running_window(running_index, &alons_samples, &dist_points); //&&&&&&&&&&&&&&&&&alons doll log
+	//running_index++;	//&&&&&&&&&&&&&&&&&alons doll log
 	long double f = (calc_frequency_fft(&dist_points, &frequency_points));
 	axes = CvPlot::makePlotAxes();
 	axes.setXLim(std::pair<double, double>(Fx_LOWER_BOUND, Fx_UPPER_BOUND));
 	axes.setYLim(std::pair<double, double>(Fy_LOWER_BOUND, Fy_UPPER_BOUND));
-	axes.create<CvPlot::Series>(frequency_points, "-k");
-	window->update();
+	if (frequency_points.size() > 50) {
+		//frequency_points[0] = cv::Point2d(0, 0);	//&&&&&&&& 
+		axes.create<CvPlot::Series>(frequency_points, "-k");
+		window->update();
+	}
 	return f;
 }
 
@@ -654,9 +686,9 @@ void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
 
 long double GraphPlot::plotDists(FrameManager& frame_manager) {
 	if (first) {
-		//window = new CvPlot::Window("Distances", axes, 600, 800);
-		//axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND)); &&&&&&&&
-		//axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND)); &&&&&&&&
+		window = new CvPlot::Window("Distances", axes, 600, 800);
+		axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND));
+		axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND));
 		first = false;
 	}
 	return updatePlotDists(frame_manager);
@@ -665,14 +697,21 @@ long double GraphPlot::plotDists(FrameManager& frame_manager) {
 long double GraphPlot::updatePlotDists(FrameManager& frame_manager) {
 	std::vector<cv::Point2d> points;
 	frame_manager.get_dists(&points);
-	//long double f = (calc_frequency_fft(&points));	//&&&&&&&&&&&	03292020
-	bool cm_units = (frame_manager.user_cfg->dimension==dimension::D3) ? true : CALC_2D_BY_CM;
-	long double f = calc_frequency_differently(&points, cm_units);
-	//axes = CvPlot::makePlotAxes(); &&&&&&&
-	//axes.create<CvPlot::Series>(points, "-b"); &&&&&&&&&
-	//window->update();
+	//axes = CvPlot::makePlotAxes(); //needed?
+	axes.create<CvPlot::Series>(points, "-b");
+	window->update();
+	long double f;
+	if (GET_FREQUENCY_BY_FFT) {
+		normalize_distances(&points);
+		f = (calc_frequency_fft(&points));
+	}
+	else {	// get_frequency_differently
+		bool cm_units = (frame_manager.user_cfg->dimension==dimension::D3) ? true : CALC_2D_BY_CM;
+		f = calc_frequency_differently(&points, cm_units);															
+	}
 	return f;
 }
+
 /* OLD FUNCTIONS: */
 
 //void save_last_frame(const char* filename, const rs2::video_frame& frame) {
