@@ -437,5 +437,8 @@
     <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\Internal\util.h">
       <Filter>Header Files\include</Filter>
     </ClInclude>
+    <ClInclude Include="concurrent_queue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

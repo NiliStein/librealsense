@@ -1,0 +1,23 @@
+#dimension: 2 for 2D or 3 for 3D
+2
+#mode: D for distances, L for location, F for Fourier, N for NoGraph
+F
+
+#distances: set to y to include a certain distance. set to n otherwise
+left-mid1 n
+left-mid2 n
+left-mid3 y
+left-right y
+right-mid1 n
+right-mid2 n
+right-mid3 y
+mid1-mid2 n
+mid1-mid3 n
+mid2-mid3 n
+
+#location: set to y to track the location of a certain sticker. set to n otherwise
+left y
+mid1 y
+mid2 y
+mid3 y
+right y

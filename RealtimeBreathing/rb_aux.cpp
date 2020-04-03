@@ -5,6 +5,7 @@
 #include <string>
 #include <ctime>
 #include <sstream>
+
 //#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 //#include <CvPlot/cvplot.h> // in .h file
@@ -58,7 +59,7 @@ FrameManager::~FrameManager()
 	}
 }
 
-void FrameManager::restart() {
+void FrameManager::reset() {
 	frame_idx = 1;
 	first_timestamp = NULL;
 	_oldest_frame_index = 0;
@@ -614,105 +615,134 @@ Config::Config(const char* config_filepath) {
 	}
 }
 
-GraphPlot::GraphPlot(FrameManager& frame_manager) {
-	axes = CvPlot::makePlotAxes();
-	clock_t current_system_time = clock();
-	time_begin = (current_system_time - frame_manager.manager_start_time) / double(CLOCKS_PER_SEC);
-}
-
-
-void GraphPlot::restart(FrameManager& frame_manager) {
-	first = true;
-	clock_t current_system_time = clock();
-	time_begin = (current_system_time - frame_manager.manager_start_time) / double(CLOCKS_PER_SEC);
-	Dx_LOWER_BOUND = time_begin;
-	Dx_UPPER_BOUND = time_begin + 90;
-	Lx_LOWER_BOUND = time_begin;
-	Lx_UPPER_BOUND = time_begin + 90;
-	axes = CvPlot::makePlotAxes();
-	delete window;
-}
-
-long double GraphPlot::plotFourier(FrameManager& frame_manager) {
-	if (first) {
-		window = new CvPlot::Window("Fourier", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(Fx_LOWER_BOUND, Fx_UPPER_BOUND));
-		axes.setYLim(std::pair<double, double>(Fy_LOWER_BOUND, Fy_UPPER_BOUND));
-		//get_samples_from_file(&alons_samples); //&&&&&&&&&&&&&&&&&alons doll log
-		first = false;
-	}
-	return updatePlotFourier(frame_manager);
-}
-
-long double GraphPlot::updatePlotFourier(FrameManager& frame_manager) {
-	std::vector<cv::Point2d> dist_points;
-	frame_manager.get_dists(&dist_points);	
-	normalize_distances(&dist_points);
+void GraphPlot::_plotFourier(std::vector<cv::Point2d>& points)
+{
+	normalize_distances(&points);
 	std::vector<cv::Point2d> frequency_points;
-	//simulate_running_window(running_index, &alons_samples, &dist_points); //&&&&&&&&&&&&&&&&&alons doll log
-	//running_index++;	//&&&&&&&&&&&&&&&&&alons doll log
-	long double f = (calc_frequency_fft(&dist_points, &frequency_points));
-	axes = CvPlot::makePlotAxes();
-	axes.setXLim(std::pair<double, double>(Fx_LOWER_BOUND, Fx_UPPER_BOUND));
-	axes.setYLim(std::pair<double, double>(Fy_LOWER_BOUND, Fy_UPPER_BOUND));
-	if (frequency_points.size() > 50) {
-		//frequency_points[0] = cv::Point2d(0, 0);	//&&&&&&&& 
-		axes.create<CvPlot::Series>(frequency_points, "-k");
-		window->update();
-	}
-	return f;
-}
+	long double f = (calc_frequency_fft(&points, &frequency_points));
+	axes.create<CvPlot::Series>(frequency_points, "-k");
 
-void GraphPlot::plotLoc(FrameManager& frame_manager) {
-	if (first) {
-		window = new CvPlot::Window("Depth", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(Lx_LOWER_BOUND, Lx_UPPER_BOUND));
-		axes.setYLim(std::pair<double, double>(Ly_LOWER_BOUND, Ly_UPPER_BOUND));
-		first = false;
-	}
-	updatePlotLoc(frame_manager);
-}
+	long double bpm = f * 60;
 
-void GraphPlot::updatePlotLoc(FrameManager& frame_manager) {
-	std::vector<cv::Point2d> points[5];
-	const std::string lineSpec[5] = { "-k", "-g", "-b", "-r", "-y" };
-	//axes = CvPlot::makePlotAxes();
-	for (int stInt = stickers::left; stInt != stickers::sdummy; stInt++) {
-		stickers s = static_cast<stickers>(stInt);
-		if (frame_manager.user_cfg->stickers_included[s]) {
-			frame_manager.get_locations(s, &points[stInt]);
-			axes.create<CvPlot::Series>(points[stInt], lineSpec[stInt]);
-		}
-	}
+	const std::string bpm_title("Freq: " + std::to_string(f) + " | " + " BPM: " + std::to_string(bpm));
+	axes.title(bpm_title);
+
+
 	window->update();
 }
 
-long double GraphPlot::plotDists(FrameManager& frame_manager) {
-	if (first) {
-		window = new CvPlot::Window("Distances", axes, 600, 800);
-		axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND));
-		axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND));
-		first = false;
-	}
-	return updatePlotDists(frame_manager);
-}
-
-long double GraphPlot::updatePlotDists(FrameManager& frame_manager) {
-	std::vector<cv::Point2d> points;
-	frame_manager.get_dists(&points);
-	//axes = CvPlot::makePlotAxes(); //needed?
+void GraphPlot::_plotDists(std::vector<cv::Point2d>& points)
+{
+	//axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND));
+	//axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND));
 	axes.create<CvPlot::Series>(points, "-b");
-	window->update();
+
 	long double f;
 	if (GET_FREQUENCY_BY_FFT) {
 		normalize_distances(&points);
 		f = (calc_frequency_fft(&points));
 	}
 	else {	// get_frequency_differently
-		bool cm_units = (frame_manager.user_cfg->dimension==dimension::D3) ? true : CALC_2D_BY_CM;
-		f = calc_frequency_differently(&points, cm_units);															
+		bool cm_units = (_dimension == dimension::D3) ? true : CALC_2D_BY_CM;
+		f = calc_frequency_differently(&points, cm_units);
 	}
-	return f;
+
+	long double bpm = f * 60;
+	const std::string bpm_title("BPM: " + std::to_string(bpm));
+	axes.title(bpm_title);
+	window->update();
+}
+
+void GraphPlot::_plotLoc(std::vector<cv::Point2d>& points, const char * lineSpec)
+{
+	axes.create<CvPlot::Series>(points, lineSpec);
+	window->update();
+}
+
+void GraphPlot::_plotNoGraph(std::vector<cv::Point2d>& points)
+{
+	long double f;
+	if (GET_FREQUENCY_BY_FFT) {
+		normalize_distances(&points);
+		f = (calc_frequency_fft(&points));
+	}
+	else {	// get_frequency_differently
+		bool cm_units = (_dimension == dimension::D3) ? true : CALC_2D_BY_CM;
+		f = calc_frequency_differently(&points, cm_units);
+	}
+
+	long double bpm = f * 60;
+
+	const std::string bpm_title("Freq | BPM");
+
+	cv::Mat1d mat(1, 2);
+	mat(0, 0) = f;
+	mat(0, 1) = bpm;
+	axes = CvPlot::plotImage(mat);
+
+	axes.title(bpm_title);
+	window->update();
+}
+
+void GraphPlot::_init_plot_window()
+{
+	switch (_mode) {
+	case graph_mode::DISTANCES:
+		window = new CvPlot::Window("Distances", axes, 600, 800);
+		break;
+	case graph_mode::FOURIER:
+		window = new CvPlot::Window("Fourier", axes, 600, 800);
+		break;
+	case graph_mode::LOCATION:
+		window = new CvPlot::Window("Depth", axes, 600, 800);
+		break;
+	case graph_mode::NOGRAPH:
+		window = new CvPlot::Window("BPM", axes, 600, 800);
+		break;
+	}
+
+
+}
+
+GraphPlot::GraphPlot(graph_mode mode, dimension dimension, clock_t start_time):
+	_mode(mode), _dimension(dimension), first_plot(true) {
+	clock_t current_system_time = clock();
+	time_begin = (current_system_time - start_time) / double(CLOCKS_PER_SEC);
+}
+
+void GraphPlot::reset(clock_t start_time) {
+	
+	clock_t current_system_time = clock();
+	time_begin = (current_system_time - start_time) / double(CLOCKS_PER_SEC);
+	axes = CvPlot::makePlotAxes();
+	delete window;
+	first_plot = true;
+}
+
+void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec, bool is_first)
+{
+	// TODO: Copy vector when we move this logic to the thread
+	if (first_plot) {
+		_init_plot_window();
+		first_plot = false;
+	}
+
+	if (is_first) {
+		axes = CvPlot::makePlotAxes();
+	}
+	switch (_mode) {
+	case graph_mode::DISTANCES:
+		_plotDists(points);
+		break;
+	case graph_mode::FOURIER:
+		_plotFourier(points);
+		break;
+	case graph_mode::LOCATION:
+		_plotLoc(points, lineSpec);
+		break;
+	case graph_mode::NOGRAPH:
+		_plotNoGraph(points);
+	}
 }
 
 /* OLD FUNCTIONS: */

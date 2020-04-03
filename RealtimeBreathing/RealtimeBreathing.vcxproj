@@ -252,6 +252,7 @@
     <ClInclude Include="..\common\realsense-ui-advanced-mode.h" />
     <ClInclude Include="..\common\ux-alignment.h" />
     <ClInclude Include="..\third-party\stb_image.h" />
+    <ClInclude Include="concurrent_queue.h" />
     <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core.h" />
     <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Axes.h" />
     <ClInclude Include="cv-plot-1.2\CvPlot\inc\CvPlot\core\Drawable.h" />

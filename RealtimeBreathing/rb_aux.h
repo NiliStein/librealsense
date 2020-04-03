@@ -156,7 +156,7 @@ public:
 	~FrameManager();
 	
 	/* reset frame manager for another run (switch between files or between live camera to file and vice versa */
-	void restart();
+	void reset();
 
 	int get_frames_array_size();
 
@@ -226,31 +226,24 @@ private:
 */
 class GraphPlot {
 private:
-	//int running_index = 0;	//&&&&&&&&&&&&&&&&&alons doll log
-	//std::vector<cv::Point2d> alons_samples;	//&&&&&&&&&&&&&&&&&alons doll log
 	CvPlot::Window* window;
 	CvPlot::Axes axes;
-	bool first = true;
 	clock_t time_begin;
-	int Fx_LOWER_BOUND = 0, Fx_UPPER_BOUND = 5, Fy_LOWER_BOUND = 0, Fy_UPPER_BOUND = 4;	//graph bounds for mode FOURIER
-	int Dx_LOWER_BOUND = time_begin, Dx_UPPER_BOUND = time_begin + 90, Dy_LOWER_BOUND = 30, Dy_UPPER_BOUND = 500;	//graph bounds for mode DISTANCES
-	int Lx_LOWER_BOUND = time_begin, Lx_UPPER_BOUND = time_begin + 90, Ly_LOWER_BOUND = 30, Ly_UPPER_BOUND = 100;	//graph bounds for mode LOCATION
-	
+	graph_mode _mode;
+	dimension _dimension;
+	bool first_plot;
+
+	void _plotFourier(std::vector<cv::Point2d>& points);
+	void _plotDists(std::vector<cv::Point2d>& points);
+	void _plotLoc(std::vector<cv::Point2d>& points, const char * lineSpec);
+	void _plotNoGraph(std::vector<cv::Point2d>& points);
+	void _init_plot_window();
 public:
 	//ctor:
-	GraphPlot(FrameManager& frame_manager);
+	GraphPlot(graph_mode mode, dimension dimension, clock_t start_time);
 	
-	void restart(FrameManager& frame_manager);
+	void reset(clock_t start_time);
 
-	long double plotFourier(FrameManager& frame_manager);
+	void plot(std::vector<cv::Point2d>& points, const char * lineSpec = NULL, bool is_first = true);
 
-	long double updatePlotFourier(FrameManager& frame_manager);
-
-	long double plotDists(FrameManager& frame_manager);
-
-	long double updatePlotDists(FrameManager& frame_manager);
-	
-	void updatePlotLoc(FrameManager& frame_manager);
-	
-	void plotLoc(FrameManager& frame_manager);
 };

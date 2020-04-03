@@ -20,7 +20,7 @@
 //struct GLFWmonitor;
 //struct GLFWwindow;
 
-#define RUN_FROM_FILE_ON_REPEAT false
+#define FILE_ON_REPEAT false
 namespace rs2
 {
 	// Wrapper for cross-platform dialog control
@@ -59,7 +59,7 @@ int main(int argc, char * argv[]) try
 
 	Config user_cfg(CONFIG_FILEPATH);
 	FrameManager frame_manager(&user_cfg);
-	GraphPlot graph(frame_manager);
+	GraphPlot graph(user_cfg.mode, user_cfg.dimension, frame_manager.manager_start_time);
 
 	bool show_camera_stream = false;
 	bool stream_enabled = false;
@@ -108,6 +108,9 @@ int main(int argc, char * argv[]) try
 					pipe.start(cfg);
 					stream_enabled = true;
 					start_time = clock();
+					frame_manager.reset(); // reset FrameManager for additional processing
+					graph.reset(frame_manager.manager_start_time);
+
 				}
 
 				if (ImGui::Button("record", { 50, 50 }))
@@ -145,9 +148,11 @@ int main(int argc, char * argv[]) try
 				if (!filename) {
 					filename = rs2::file_dialog_open(rs2::file_dialog_mode::open_file, "ROS-bag\0*.bag\0", NULL, NULL);
 					if (filename) {
-						cfg.enable_device_from_file(filename, RUN_FROM_FILE_ON_REPEAT);
+						cfg.enable_device_from_file(filename, FILE_ON_REPEAT);
 						start_time = clock();
 						pipe.start(cfg); //File will be opened in read mode at this point
+						frame_manager.reset(); // reset FrameManager for additional processing
+						graph.reset(frame_manager.manager_start_time);
 					}
 					else { //user clicked -choose file- ans then clicked -cancel-
 						run_on_existing_file = false;
@@ -167,8 +172,6 @@ int main(int argc, char * argv[]) try
 					pipe.stop();
 					//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
 					filename = nullptr;
-					frame_manager.restart(); // reset FrameManager for additional processing
-					graph.restart(frame_manager);
 				}
 
 				if (stream_enabled) {
@@ -194,8 +197,8 @@ int main(int argc, char * argv[]) try
 
 			// using the align object, we block the application until a frameset is available
 			rs2::frameset fs;
-			if (run_on_existing_file && !RUN_FROM_FILE_ON_REPEAT) {
-				if (!pipe.try_wait_for_frames(&fs, 10000)) {
+			if (run_on_existing_file && !FILE_ON_REPEAT) {
+				if (!pipe.try_wait_for_frames(&fs, 100)) {
 					/*
 					if run on file ended, stop pipe
 					*/
@@ -205,8 +208,6 @@ int main(int argc, char * argv[]) try
 					pipe.stop();
 					//reset filename argument, so that if 'choose existing file' is clicked again, a new explorer window will appear
 					filename = nullptr;
-					frame_manager.restart(); // reset FrameManager for additional processing
-					graph.restart(frame_manager);
 					continue;
 				}
 			}
@@ -252,22 +253,34 @@ int main(int argc, char * argv[]) try
 			ImGui::NextColumn();
 
 			
-			//TODO: plot data
 			if (user_cfg.mode == graph_mode::DISTANCES) {
 
-				f = graph.plotDists(frame_manager);
-				bpm = f * 60.0;
+				std::vector<cv::Point2d> points;
+				frame_manager.get_dists(&points);
+				graph.plot(points);
 			}
 			if (user_cfg.mode == graph_mode::FOURIER) {
-				f = graph.plotFourier(frame_manager);
-				bpm = f * 60.0;
+				std::vector<cv::Point2d> points;
+				frame_manager.get_dists(&points);
+				graph.plot(points);
 			}
 			if (user_cfg.mode == graph_mode::LOCATION) {
-				graph.plotLoc(frame_manager);
+				const char * lineSpec[5] = { "-k", "-g", "-b", "-r", "-y" };
+				std::vector<cv::Point2d> points;
+				bool is_first = true;
+				for (int stInt = stickers::left; stInt != stickers::sdummy; stInt++) {
+					stickers s = static_cast<stickers>(stInt);
+					if (frame_manager.user_cfg->stickers_included[s]) {
+						frame_manager.get_locations(s, &points);
+						graph.plot(points, lineSpec[stInt], is_first);
+						is_first = false;
+					}
+				}
 			}
 			if (user_cfg.mode == graph_mode::NOGRAPH) {
-				f = frame_manager.no_graph();
-				bpm = f * 60.0;
+				std::vector<cv::Point2d> points;
+				frame_manager.get_dists(&points);
+				graph.plot(points);
 			}
 			
 			glColor4f(1.f, 1.f, 1.f, 1.f);
