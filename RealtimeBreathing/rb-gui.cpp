@@ -10,6 +10,9 @@
 #include <opencv2/opencv.hpp>
 #include <chrono>
 
+
+
+
 // copied os.h because project does comile when including it (seems to be due to double inclusion of rendering.h)
 // *****	START of os.h copy	*****
 
@@ -198,7 +201,7 @@ int main(int argc, char * argv[]) try
 			// using the align object, we block the application until a frameset is available
 			rs2::frameset fs;
 			if (run_on_existing_file && !FILE_ON_REPEAT) {
-				if (!pipe.try_wait_for_frames(&fs, 100)) {
+				if (!pipe.try_wait_for_frames(&fs, 1000)) {
 					/*
 					if run on file ended, stop pipe
 					*/
@@ -243,7 +246,7 @@ int main(int argc, char * argv[]) try
 
 			// present all the collected frames with opengl mosaic
 			app.show(render_frames);
-
+			
 			end_time = clock();
 			//set interval of 15 seconds:
 			if (double(end_time - start_time) / double(CLOCKS_PER_SEC) >= 15.0) {
@@ -266,14 +269,12 @@ int main(int argc, char * argv[]) try
 			}
 			if (user_cfg.mode == graph_mode::LOCATION) {
 				const char * lineSpec[5] = { "-k", "-g", "-b", "-r", "-y" };
-				std::vector<cv::Point2d> points;
-				bool is_first = true;
+				std::vector<cv::Point2d> points[5];
 				for (int stInt = stickers::left; stInt != stickers::sdummy; stInt++) {
 					stickers s = static_cast<stickers>(stInt);
 					if (frame_manager.user_cfg->stickers_included[s]) {
-						frame_manager.get_locations(s, &points);
-						graph.plot(points, lineSpec[stInt], is_first);
-						is_first = false;
+						frame_manager.get_locations(s, &points[stInt]);
+						graph.plot(points[stInt], lineSpec[stInt]);
 					}
 				}
 			}

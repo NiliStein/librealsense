@@ -620,6 +620,8 @@ void GraphPlot::_plotFourier(std::vector<cv::Point2d>& points)
 	normalize_distances(&points);
 	std::vector<cv::Point2d> frequency_points;
 	long double f = (calc_frequency_fft(&points, &frequency_points));
+	axes.setXLim(std::pair<double, double>(0, 5));
+	axes.setYLim(std::pair<double, double>(0, 5));
 	axes.create<CvPlot::Series>(frequency_points, "-k");
 
 	long double bpm = f * 60;
@@ -719,7 +721,7 @@ void GraphPlot::reset(clock_t start_time) {
 	first_plot = true;
 }
 
-void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec, bool is_first)
+void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec)
 {
 	// TODO: Copy vector when we move this logic to the thread
 	if (first_plot) {
@@ -727,7 +729,7 @@ void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec, bo
 		first_plot = false;
 	}
 
-	if (is_first) {
+	if (_mode == graph_mode::FOURIER) {
 		axes = CvPlot::makePlotAxes();
 	}
 	switch (_mode) {

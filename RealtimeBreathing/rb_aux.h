@@ -239,11 +239,12 @@ private:
 	void _plotNoGraph(std::vector<cv::Point2d>& points);
 	void _init_plot_window();
 public:
+
 	//ctor:
 	GraphPlot(graph_mode mode, dimension dimension, clock_t start_time);
 	
 	void reset(clock_t start_time);
 
-	void plot(std::vector<cv::Point2d>& points, const char * lineSpec = NULL, bool is_first = true);
+	void plot(std::vector<cv::Point2d>& points, const char * lineSpec = NULL);
 
 };
