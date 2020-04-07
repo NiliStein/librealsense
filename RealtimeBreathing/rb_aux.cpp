@@ -94,7 +94,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	int high_thresh = 255;
 
 	//find required color:
-	switch (color) {
+	switch (user_cfg->color) {
 	case(YELLOW):
 		//RECOMMENDED
 		//hsv opencv official yellow range: (20, 100, 100) to (30, 255, 255)
@@ -627,10 +627,19 @@ Config::Config(const char* config_filepath, int* res) {
 	if (line.compare("4") == 0) NUM_OF_STICKERS = 4;
 	else NUM_OF_STICKERS = 5;
 	while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
+	// get sticker color
+	getline(config_file, line);
+	std::string c = line.substr(0, 1);
+	if (c.compare("Y") == 0) color = sticker_color::YELLOW;
+	if (c.compare("B") == 0) color = sticker_color::BLUE;
+	//if (c.compare("R") == 0) color = sticker_color::RED;
+	if (c.compare("G") == 0) color = sticker_color::GREEN;
+	while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
 	// get 2Dmeasure unit
 	getline(config_file, line);
 	if (line.compare("cm") == 0) CALC_2D_BY_CM = true;
 	else CALC_2D_BY_CM = false;
+	
 
 	// check illegal use of sticker mid1
 	// if NUM_OF_STICKERS is 4, there is no mid1 sticker

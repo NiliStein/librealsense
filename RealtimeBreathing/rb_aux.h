@@ -73,6 +73,7 @@ public:
 	graph_mode mode;
 	std::map<stickers, bool> stickers_included;
 	std::map<distances, bool> dists_included;
+	sticker_color color;
 
 	//ctor:
 	Config(const char* config_filepath, int* res);
@@ -228,7 +229,6 @@ private:
 	const char* _frame_disk_path;
 	bool interval_active;
 	int frames_dumped_in_row = 0; //reinitialized after cleanup
-	sticker_color color;
 
 };
 
