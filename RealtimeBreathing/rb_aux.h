@@ -14,8 +14,12 @@
 #define GET_FREQUENCY_BY_FFT true	//if false, use get_frequency_differently
 
 
-
-
+enum sticker_color {
+	YELLOW,
+	BLUE,
+	GREEN,
+	RED
+};
 
 enum dimension {
 	D2,
@@ -224,6 +228,7 @@ private:
 	const char* _frame_disk_path;
 	bool interval_active;
 	int frames_dumped_in_row = 0; //reinitialized after cleanup
+	sticker_color color;
 
 };
 

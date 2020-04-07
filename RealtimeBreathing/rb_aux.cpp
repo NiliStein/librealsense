@@ -88,37 +88,55 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 
 	BreathingFrameData * breathing_data = new BreathingFrameData();
 
-	//find yellows:
-	cv::Mat yellow_only_mask(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC1);
-	//hsv official yellow range: (20, 100, 100) to (30, 255, 255)
-	inRange(hsv8_mat, cv::Scalar(20, 50, 50), cv::Scalar(40, 255, 255), yellow_only_mask); //yellow hsv range
-	cv::Mat yellow_only_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, cv::Scalar(0, 0, 0));
-	hsv8_mat.copyTo(yellow_only_mat, yellow_only_mask);
+	cv::Scalar color_range_low;
+	cv::Scalar color_range_high;
+	int low_thresh = 10;
+	int high_thresh = 255;
 
-	// TODO: For Debug only, remove when finished
-	//cv::imwrite("frames\\only_yellow.jpg", yellow_only_mat);
+	//find required color:
+	switch (color) {
+	case(YELLOW):
+		//RECOMMENDED
+		//hsv opencv official yellow range: (20, 100, 100) to (30, 255, 255)
+		color_range_low = cv::Scalar(20, 50, 50);
+		color_range_high = cv::Scalar(40, 255, 255);
+		break;
+	case(BLUE):
+		color_range_low = cv::Scalar(90, 20, 10);
+		color_range_high = cv::Scalar(135, 255, 255);
+		low_thresh = 10;
+		break;
+	case(GREEN):
+		color_range_low = cv::Scalar(35, 30, 30);
+		color_range_high = cv::Scalar(85, 255, 255);
+		low_thresh = 20;
+		break;
+	case(RED):
+	//	color_range_low = cv::Scalar(20, 50, 50);
+	//	color_range_high = cv::Scalar(135, 255, 255);
+		break;
+	}
 
+	cv::Mat color_only_mask(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC1);
+	inRange(hsv8_mat, color_range_low, color_range_high, color_only_mask);
+	cv::Mat color_only_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3, cv::Scalar(0, 0, 0));
+	hsv8_mat.copyTo(color_only_mat, color_only_mask);
 
 	//Pick up the grayscale
-	cv::Mat yellow_only_bgr8_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
-	cvtColor(yellow_only_mat, yellow_only_bgr8_mat, cv::COLOR_HSV2BGR);
-	cv::Mat yellow_only_grayscale_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
-	cvtColor(yellow_only_bgr8_mat, yellow_only_grayscale_mat, cv::COLOR_BGR2GRAY);
+	cv::Mat color_only_bgr8_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
+	cvtColor(color_only_mat, color_only_bgr8_mat, cv::COLOR_HSV2BGR);
+	cv::Mat color_only_grayscale_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
+	cvtColor(color_only_bgr8_mat, color_only_grayscale_mat, cv::COLOR_BGR2GRAY);
 	
 	// TODO: For Debug only, remove when finished
 	//cv::imwrite("frames\\yellow_grayscale.jpg", yellow_only_grayscale_mat);
 	
 	//create binary image:
 	cv::Mat image_th;
-	cv::Mat bin_mat(yellow_only_grayscale_mat.size(), yellow_only_grayscale_mat.type());
+	cv::Mat bin_mat(color_only_grayscale_mat.size(), color_only_grayscale_mat.type());
 	
 	// simple threshold worked better than adaptive
-	cv::threshold(yellow_only_grayscale_mat, image_th, 100, 255, cv::THRESH_BINARY);
-	//TODO: remove?
-	//cv::adaptiveThreshold(yellow_only_grayscale_mat, image_th, 255,
-	//	cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY_INV, 3, 5);
-	
-	//cv::imwrite("frames\\yellow_grayscale_gaussian.jpg", image_th);
+	cv::threshold(color_only_grayscale_mat, image_th, low_thresh, high_thresh, cv::THRESH_BINARY);
 
 	//connected components:
 	cv::Mat1i labels;
@@ -198,7 +216,10 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	breathing_data->system_timestamp = (current_system_time - manager_start_time) / double(CLOCKS_PER_SEC); //time in seconds elapsed since frame manager created
 
 	
-	if (!first_timestamp) first_timestamp = (breathing_data->color_timestamp < breathing_data->depth_timestamp) ? breathing_data->color_timestamp : breathing_data->depth_timestamp;
+	if (!first_timestamp) first_timestamp =
+		(breathing_data->color_timestamp < breathing_data->depth_timestamp) ?
+		breathing_data->color_timestamp :
+		breathing_data->depth_timestamp;
 	breathing_data->frame_idx = frame_idx; 
 	frame_idx++;
 	breathing_data->color_idx = color_frame.get_frame_number();
