@@ -90,7 +90,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 
 	cv::Scalar color_range_low;
 	cv::Scalar color_range_high;
-	int low_thresh = 10;
+	int low_thresh = 100;
 	int high_thresh = 255;
 
 	//find required color:
