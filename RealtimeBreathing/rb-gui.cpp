@@ -10,9 +10,6 @@
 #include <opencv2/opencv.hpp>
 #include <chrono>
 
-
-
-
 // copied os.h because project does comile when including it (seems to be due to double inclusion of rendering.h)
 // *****	START of os.h copy	*****
 
@@ -24,6 +21,13 @@
 //struct GLFWwindow;
 
 #define FILE_ON_REPEAT false
+extern void init_logFile(const char* filename, int num_of_stickers, std::string D2units);
+extern std::ofstream logFile;
+extern bool CALC_2D_BY_CM;
+extern int NUM_OF_STICKERS;
+const char* config_err1 = "Warning: distance from mid1 was set to y, while number of stickers is 4. This distance will be disregarded.";
+const char* config_err2 = "Warning: location of mid1 was set to y, while number of stickers is 4. This location will be disregarded.";
+const char* config_errors[2] = { config_err1, config_err2 };
 namespace rs2
 {
 	// Wrapper for cross-platform dialog control
@@ -60,7 +64,9 @@ int main(int argc, char * argv[]) try
 	rs2::align align_to_depth(RS2_STREAM_DEPTH);
 	rs2::align align_to_color(RS2_STREAM_COLOR);
 
-	Config user_cfg(CONFIG_FILEPATH);
+
+	int config_res;
+	Config user_cfg(CONFIG_FILEPATH, &config_res);
 	FrameManager frame_manager(&user_cfg);
 	GraphPlot graph(user_cfg.mode, user_cfg.dimension, frame_manager.manager_start_time);
 
@@ -70,18 +76,20 @@ int main(int argc, char * argv[]) try
 
 	const char* filename = nullptr;	// filename will hold the name of an existing file chosen bu user to analyze.
 									// defined here, so that nullity can indeicate if file was already chosen or not.
-	bool run_on_existing_file = false; //When true, run analysis for an existing file chosen by user through open_dialog
-	bool recording = false; //When true, record camera stream to file
-
-	clock_t start_time, end_time; //measure time, for 15 seconds intervals
+	bool run_on_existing_file = false; // When true, run analysis for an existing file chosen by user through open_dialog.
+	bool recording = false; // When true, record camera stream to file.
+	bool pause = false;	// when true, pause streaming file. only available while sreaming from an existing file.
+	clock_t start_time, end_time; // measure time, for 15 seconds intervals.
 	long double f = 0; 
 	long double bpm = 0;
+
+	//&&&&&&&& moved declaration for within the main loop to here, for use of freezing frame when pausing a stream from file
+	rs2::frameset fs; 
 	while (app) // application still alive?
 	{
 		// Flags for displaying ImGui window
 		static const int flags = ImGuiWindowFlags_NoCollapse
 			| ImGuiWindowFlags_NoSavedSettings
-			//	| ImGuiWindowFlags_NoResize
 			| ImGuiWindowFlags_AlwaysAutoResize;
 
 		// render the ui:
@@ -91,6 +99,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
 		if (user_cfg.mode != graph_mode::LOCATION) ImGui::Text("Frequency: %f	BPM:  %f", f, bpm);
+		if (config_res) ImGui::Text(config_errors[config_res - 1]);
 		
 			if (show_camera_stream && !run_on_existing_file) {
 			
@@ -103,6 +112,7 @@ int main(int argc, char * argv[]) try
 					pipe.stop();
 					//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
 					filename = nullptr;
+					logFile.close();
 				}
 
 				if (!stream_enabled) {
@@ -113,6 +123,8 @@ int main(int argc, char * argv[]) try
 					start_time = clock();
 					frame_manager.reset(); // reset FrameManager for additional processing
 					graph.reset(frame_manager.manager_start_time);
+					std::string D2units = (CALC_2D_BY_CM) ? "cm" : "pixels";
+					init_logFile(filename, NUM_OF_STICKERS, D2units);
 
 				}
 
@@ -146,6 +158,7 @@ int main(int argc, char * argv[]) try
 					cfg.disable_stream(RS2_STREAM_COLOR);
 					pipe.stop();
 					stream_enabled = false;
+					logFile.close();
 				}
 
 				if (!filename) {
@@ -156,11 +169,53 @@ int main(int argc, char * argv[]) try
 						pipe.start(cfg); //File will be opened in read mode at this point
 						frame_manager.reset(); // reset FrameManager for additional processing
 						graph.reset(frame_manager.manager_start_time);
+						std::string D2units = (CALC_2D_BY_CM) ? "cm" : "pixels";
+						init_logFile(filename, NUM_OF_STICKERS, D2units);
 					}
 					else { //user clicked -choose file- ans then clicked -cancel-
 						run_on_existing_file = false;
 					}
 					
+				}
+
+				if (pause) {
+					if (ImGui::Button("unpause", { 50, 50 })) {
+						pause = false;
+						rs2::device device = pipe.get_active_profile().get_device();
+						rs2::playback playback = device.as<rs2::playback>();
+						playback.resume();
+					}
+					else {
+						//&&&&&&&& following code freezez the last frame while pausing
+						if (fs.size() > 0) {
+
+							auto d = fs.get_depth_frame();
+							auto c = fs.get_color_frame();
+							
+							std::map<int, rs2::frame> freeze_frames;
+							freeze_frames[0] = colorizer.process(c);
+							freeze_frames[1] = colorizer.process(d);
+
+							// present last collected frame
+							app.show(freeze_frames);
+						}
+						ImGui::End();
+						ImGui::Render();
+						continue;
+					}
+				}
+				if (!pause) {
+					if (ImGui::Button("pause", { 50, 50 }))
+					{
+						pause = true;
+						rs2::device device = pipe.get_active_profile().get_device();
+						rs2::playback playback = device.as<rs2::playback>();
+						playback.pause();
+						ImGui::End();
+						ImGui::Render();
+						continue;
+					}
+
 				}
 				
 			}
@@ -173,8 +228,9 @@ int main(int argc, char * argv[]) try
 					cfg.disable_all_streams();
 					cfg = rs2::config();
 					pipe.stop();
-					//reset filename argumenr, so that if 'choose existing file' is clicked again, a new explorer window will appear
+					//reset filename argument, so that if 'choose existing file' is clicked again, a new explorer window will appear
 					filename = nullptr;
+					logFile.close();
 				}
 
 				if (stream_enabled) {
@@ -185,6 +241,7 @@ int main(int argc, char * argv[]) try
 					cfg.disable_stream(RS2_STREAM_COLOR);
 					pipe.stop();
 					stream_enabled = false;
+					logFile.close();
 				}
 
 				ImGui::End();
@@ -199,7 +256,8 @@ int main(int argc, char * argv[]) try
 			}
 
 			// using the align object, we block the application until a frameset is available
-			rs2::frameset fs;
+			//&&&&&&&& moved declaration to out of main loop (above)
+			//rs2::frameset fs; 
 			if (run_on_existing_file && !FILE_ON_REPEAT) {
 				if (!pipe.try_wait_for_frames(&fs, 1000)) {
 					/*
@@ -211,6 +269,7 @@ int main(int argc, char * argv[]) try
 					pipe.stop();
 					//reset filename argument, so that if 'choose existing file' is clicked again, a new explorer window will appear
 					filename = nullptr;
+					logFile.close();
 					continue;
 				}
 			}
@@ -261,6 +320,7 @@ int main(int argc, char * argv[]) try
 				std::vector<cv::Point2d> points;
 				frame_manager.get_dists(&points);
 				graph.plot(points);
+				
 			}
 			if (user_cfg.mode == graph_mode::FOURIER) {
 				std::vector<cv::Point2d> points;

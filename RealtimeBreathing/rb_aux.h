@@ -1,15 +1,21 @@
+#ifndef RBAUX_H
+#define RBAUX_H
 #pragma once
 
 #include <librealsense2/rs.hpp>
 #include <opencv2/opencv.hpp>
 #include <CvPlot/cvplot.h>
+//for logging purposes
+#include <fstream>
 
-//#define NUM_OF_LAST_FRAMES 450 //max number of 15 seconds under 30 fps //&&&&&&&&&&&&&
+
 #define NUM_OF_LAST_FRAMES 250 
 #define CONFIG_FILEPATH "config.txt"
+#define GET_FREQUENCY_BY_FFT true	//if false, use get_frequency_differently
 
-// OLD:
-//void save_last_frame(const char* filename, const rs2::video_frame& frame);
+
+
+
 
 enum dimension {
 	D2,
@@ -65,7 +71,7 @@ public:
 	std::map<distances, bool> dists_included;
 
 	//ctor:
-	Config(const char* config_filepath);
+	Config(const char* config_filepath, int* res);
 };
 
 /*	BreathingFrameData class
@@ -209,6 +215,7 @@ private:
 	 * NOTE: only last n_frames saved so the oldest frame_data will be deleted 
 	 */
 	void add_frame_data(BreathingFrameData * frame_data);
+
 	int frame_idx = 1;
 	double first_timestamp = NULL;
 	unsigned int _n_frames;
@@ -217,6 +224,7 @@ private:
 	const char* _frame_disk_path;
 	bool interval_active;
 	int frames_dumped_in_row = 0; //reinitialized after cleanup
+
 };
 
 /*	GraphManager class.
@@ -248,3 +256,5 @@ public:
 	void plot(std::vector<cv::Point2d>& points, const char * lineSpec = NULL);
 
 };
+
+#endif

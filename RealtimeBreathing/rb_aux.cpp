@@ -10,20 +10,17 @@
 #include <opencv2/opencv.hpp>
 //#include <CvPlot/cvplot.h> // in .h file
 
-//TODO: for logging
-#include <fstream>
+
 
 #define CALC_2D_DIST(name1,name2) { distance2D((*(name1))[0], (*(name1))[1], (*(name2))[0], (*(name2))[1]) }
 #define CALC_3D_DIST(name1,name2) { distance3D(name1[0], name1[1], name1[2], name2[0], name2[1], name2[2]) }
 #define COORDINATES_TO_STRING_CM(circle) (std::to_string(circle[0]) + ", " + std::to_string(circle[1]) + ", " + std::to_string(circle[2]))
 #define COORDINATES_TO_STRING_PIXELS(circle) (std::to_string(circle[0][0]) + ", " + std::to_string(circle[0][1]))
 
-
-#define NUM_OF_STICKERS 5
-#define CALC_2D_BY_CM false	//if false, calculate by pixels
-#define GET_FREQUENCY_BY_FFT true	//if false, use get_frequency_differently
-
-
+//#define NUM_OF_STICKERS 5
+int NUM_OF_STICKERS;
+//#define CALC_2D_BY_CM false	//if false, calculate by pixels
+bool CALC_2D_BY_CM;	//if false, calculate by pixels
 
 /* Compare functions to sort the stickers: */
 
@@ -58,6 +55,7 @@ FrameManager::~FrameManager()
 		free(_frame_data_arr);
 	}
 }
+
 
 void FrameManager::reset() {
 	frame_idx = 1;
@@ -172,8 +170,11 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	if (user_cfg->dimension == dimension::D3) {
 		if (check_illegal_3D_coordinates(breathing_data)) {
 			frames_dumped_in_row++;
-			logFile << "Warning: illegal 3D coordinates! frame was dumped.\n";
-			if (frames_dumped_in_row >= 3) cleanup();
+			logFile << "Warning: illegal 3D coordinates! frame was dumped.,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
+			if (frames_dumped_in_row >= 3) {
+				logFile << '\n';
+				cleanup();
+			}
 			return;
 		}
 		else {
@@ -205,10 +206,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	breathing_data->system_color_timestamp = (breathing_data->color_timestamp - first_timestamp) / double(CLOCKS_PER_SEC); //time elapsed from first timestamp in video - which timestamp?
 	breathing_data->system_depth_timestamp = (breathing_data->depth_timestamp - first_timestamp) / double(CLOCKS_PER_SEC);
 
-	//TODO: for logging
-	//logFile << breathing_data->GetDescription();	//&&&&&&&&&&&&&&&
-	breathing_data->GetDescription_temp();
-
 	/*
 	//TODO: for debugging:
 	if (this->interval_active) {
@@ -236,8 +233,14 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 		
 
 	}
-	if (!is_dup) add_frame_data(breathing_data);
-	
+	if (!is_dup) {
+		//TODO: for logging
+		breathing_data->GetDescription_temp();
+		add_frame_data(breathing_data);
+	}
+	else {
+		logFile << ",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
+	}
 }
 
 void FrameManager::cleanup()
@@ -251,7 +254,7 @@ void FrameManager::cleanup()
 			_frame_data_arr[i] = NULL;
 		}
 	}
-	logFile << "frames array cleanup...\n";
+	logFile << "frames array cleanup...\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
 	frames_dumped_in_row = 0;
 }
 
@@ -270,7 +273,7 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 
 void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
 	if (user_cfg->mode != graph_mode::LOCATION) {
-		logFile << "Warning: get_locations was called in incompatible mode! (use L mode)\n";
+		logFile << "Warning: get_locations was called in incompatible mode! (use L mode),,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
 		return;
 	}
 	if (_frame_data_arr == NULL) return;	
@@ -289,7 +292,7 @@ void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
 
 void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 	if (user_cfg->mode == graph_mode::LOCATION) {
-		logFile << "Warning: get_dists was called in LOCATION mode!\n";
+		logFile << "Warning: get_dists was called in LOCATION mode!,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
 		return;
 	}
 	if (_frame_data_arr == NULL) return;
@@ -299,7 +302,9 @@ void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_dists is run after add_frame_data (after _oldest_frame_idx++)
 		if (_frame_data_arr[idx] != NULL) {
 			double avg_dist = (user_cfg->dimension == dimension::D2) ? _frame_data_arr[idx]->average_2d_dist : _frame_data_arr[idx]->average_3d_dist;
-			double t = _frame_data_arr[idx]->system_timestamp; 
+			//&&&&&&&&&&&
+			//double t = _frame_data_arr[idx]->system_timestamp; 
+			double t = (user_cfg->dimension == dimension::D2) ? _frame_data_arr[idx]->system_color_timestamp : _frame_data_arr[idx]->system_depth_timestamp;
 			out->push_back(cv::Point2d(t, avg_dist));
 		}
 	}
@@ -507,58 +512,48 @@ void BreathingFrameData::GetDescription_temp()
 {
 	const std::string d2method = (CALC_2D_BY_CM) ? "cm" : "pixels";
 
-	logFile << "#################################################\nFrame idx: " << std::to_string(frame_idx);
-	logFile << "\nColor idx : " << std::to_string(color_idx);
-	logFile << "\nDepth idx : " + std::to_string(depth_idx);
-	logFile << "\nColor timestamp: " + std::to_string(color_timestamp) <<
-		"\nDepth timestamp: " << std::to_string(depth_timestamp) <<
-		"\nSystem color timestamp: " << std::to_string(system_color_timestamp) <<
-		"\nSystem depth timestamp: " << std::to_string(system_depth_timestamp) <<
-		"\nCoordinates cm:\n" << "left: " << std::fixed << std::setprecision(2) << left_cm[0] << " " << std::fixed << std::setprecision(2) << left_cm[1] << " " << std::fixed << std::setprecision(2) << left_cm[2];
-	logFile <<  "\nright: " << std::fixed << std::setprecision(2) << right_cm[0] << " " << std::fixed << std::setprecision(2) << right_cm[1] << " " << std::fixed << std::setprecision(2) << right_cm[2];
-	if (NUM_OF_STICKERS == 5) logFile << "\nmid1: " << std::fixed << std::setprecision(2) << mid1_cm[0] << " " << std::fixed << std::setprecision(2) << mid1_cm[1] << " " << std::fixed << std::setprecision(2) << mid1_cm[2];
-	logFile << "\nmid2: " << std::fixed << std::setprecision(2) << mid2_cm[0] << " " << std::fixed << std::setprecision(2) << mid2_cm[1] << " " << std::fixed << std::setprecision(2) << mid2_cm[2];
-	logFile <<	"\nmid3: " << std::fixed << std::setprecision(2) << mid3_cm[0] << " " << std::fixed << std::setprecision(2) << mid3_cm[1] << " " << std::fixed << std::setprecision(2) << mid3_cm[2];
-	logFile <<	"\nCoordinates pixels:\n" <<
-		"left: " <<std::fixed << std::setprecision(2) << (*left)[0] << " " << std::fixed << std::setprecision(2) << (*left)[1] <<
-		"\nright: " << std::setprecision(2) << (*right)[0] << " " << std::setprecision(2) << (*right)[1];
-	if (NUM_OF_STICKERS == 5) logFile << "\nmid1: " << std::fixed << std::setprecision(2) << (*mid1)[0] << " " << std::fixed << std::setprecision(2) << (*mid1)[1];
-	logFile << "\nmid2: " << std::fixed << std::setprecision(2) << (*mid2)[0] << " " << std::fixed << std::setprecision(2) << (*mid2)[1];
-	logFile << "\nmid3: " << std::fixed << std::setprecision(2) << (*mid3)[0] << " " << std::fixed << std::setprecision(2) << (*mid3)[1];
-	logFile <<"\n2D distances (" << d2method << "):";
-
-	if (NUM_OF_STICKERS == 5)  logFile << "\nleft-mid1: " << std::fixed << std::setprecision(2) << dLM1;
-	logFile << "\nleft-mid2: " << std::fixed << std::setprecision(2) << dLM2 <<
-		"\nleft-mid3: " << std::fixed << std::setprecision(2) << dLM3 <<
-		"\nleft-right: " << std::fixed << std::setprecision(2) << dLR;
-	if (NUM_OF_STICKERS == 5)  logFile << "\nright-mid1: " << std::fixed << std::setprecision(2) << dRM1;
-	logFile << "\nright-mid2: " << std::fixed << std::setprecision(2) << dRM2 <<
-		"\nright-mid3: " << std::fixed << std::setprecision(2) << dRM3;
+	logFile << std::to_string(frame_idx) << "," << std::to_string(color_idx) << "," << std::to_string(depth_idx) << "," << std::to_string(color_timestamp) << "," <<
+		std::to_string(depth_timestamp) << "," << std::to_string(system_color_timestamp) << "," << std::to_string(system_depth_timestamp) << "," <<
+		std::to_string(system_timestamp) << "," << std::fixed << std::setprecision(2) << left_cm[0] << " " << std::fixed << std::setprecision(2) << left_cm[1] << " " <<
+		std::fixed << std::setprecision(2) << left_cm[2] << "," << std::fixed << std::setprecision(2) << right_cm[0] << " " << std::fixed << std::setprecision(2) <<
+		right_cm[1] << " " << std::fixed << std::setprecision(2) << right_cm[2] << ",";
 	if (NUM_OF_STICKERS == 5) {
-		logFile << "\nmid1-mid2: " << std::fixed << std::setprecision(2) << dM1M2 <<
-			"\nmid1-mid3: " << std::fixed << std::setprecision(2) << dM1M3;
+		logFile << std::fixed << std::setprecision(2) << mid1_cm[0] << " " << std::fixed << std::setprecision(2) << mid1_cm[1] << " " << std::fixed << std::setprecision(2) <<
+			mid1_cm[2] << ",";
 	}
-	logFile << "\nmid2-mid3: " << std::fixed << std::setprecision(2) << dM2M3 <<
-		"\n3D distances:";
+	logFile << std::fixed << std::setprecision(2) << mid2_cm[0] << " " << std::fixed << std::setprecision(2) << mid2_cm[1] << " " << std::fixed << std::setprecision(2) <<
+		mid2_cm[2] << "," << std::fixed << std::setprecision(2) << mid3_cm[0] << " " << std::fixed << std::setprecision(2) << mid3_cm[1] << " " << std::fixed <<
+		std::setprecision(2) << mid3_cm[2] << "," << std::fixed << std::setprecision(2) << (*left)[0] << " " << std::fixed << std::setprecision(2) << (*left)[1] << "," <<
+		std::setprecision(2) << (*right)[0] << " " << std::setprecision(2) << (*right)[1] << ",";
+	if (NUM_OF_STICKERS == 5) logFile << std::fixed << std::setprecision(2) << (*mid1)[0] << " " << std::fixed << std::setprecision(2) << (*mid1)[1] << ",";
+	logFile << std::fixed << std::setprecision(2) << (*mid2)[0] << " " << std::fixed << std::setprecision(2) << (*mid2)[1] << "," << std::fixed << std::setprecision(2) <<
+		(*mid3)[0] << " " << std::fixed << std::setprecision(2) << (*mid3)[1] << ",";
 
-	if (NUM_OF_STICKERS == 5)  logFile << "\nleft-mid1: " << std::fixed << std::setprecision(2) << dLM1_depth;
-	logFile << "\nleft-mid2: " << std::fixed << std::setprecision(2) << dLM2_depth <<
-		"\nleft-mid3: " << std::fixed << std::setprecision(2) << dLM3_depth <<
-		"\nleft-right: " << std::fixed << std::setprecision(2) << dLR_depth;
-	if (NUM_OF_STICKERS == 5)  logFile << "\nright-mid1: " << std::fixed << std::setprecision(2) << dRM1_depth;
-	logFile << "\nright-mid2: " << std::fixed << std::setprecision(2) << dRM2_depth <<
-		"\nright-mid3: " << std::setprecision(2) << dRM3_depth;
+	if (NUM_OF_STICKERS == 5)  logFile << std::fixed << std::setprecision(2) << dLM1 << ",";
+	logFile << std::fixed << std::setprecision(2) << dLM2 << "," << std::fixed << std::setprecision(2) << dLM3 << "," << std::fixed << std::setprecision(2) << dLR <<
+		",";
+	if (NUM_OF_STICKERS == 5)  logFile << std::fixed << std::setprecision(2) << dRM1 << ",";
+	logFile << std::fixed << std::setprecision(2) << dRM2 << "," << std::fixed << std::setprecision(2) << dRM3 << ",";
 	if (NUM_OF_STICKERS == 5) {
-		logFile << "\nmid1-mid2: " << std::fixed << std::setprecision(2) << dM1M2_depth <<
-			"\nmid1-mid3: " << std::fixed << std::setprecision(2) << dM1M3_depth;
+		logFile << std::fixed << std::setprecision(2) << dM1M2 << "," << std::fixed << std::setprecision(2) << dM1M3 << ",";
 	}
-	logFile << "\nmid2-mid3: " << std::fixed << std::setprecision(2) << dM2M3_depth <<
-		"\n2D average distance: " << std::fixed << std::setprecision(6) << average_2d_dist <<
-		"\n3D average distance: " << std::fixed << std::setprecision(6) << average_3d_dist << "\n";	 
+	logFile << std::fixed << std::setprecision(2) << dM2M3 << ",";
+
+	if (NUM_OF_STICKERS == 5)  logFile << std::fixed << std::setprecision(2) << dLM1_depth << ",";
+	logFile << std::fixed << std::setprecision(2) << dLM2_depth << "," << std::fixed << std::setprecision(2) << dLM3_depth << "," <<
+		std::fixed << std::setprecision(2) << dLR_depth << ",";
+	if (NUM_OF_STICKERS == 5)  logFile << std::fixed << std::setprecision(2) << dRM1_depth << ",";
+	logFile << std::fixed << std::setprecision(2) << dRM2_depth << "," << std::setprecision(2) << dRM3_depth << ",";
+	if (NUM_OF_STICKERS == 5) {
+		logFile << std::fixed << std::setprecision(2) << dM1M2_depth << "," << std::fixed << std::setprecision(2) << dM1M3_depth << ",";
+	}
+	logFile << std::fixed << std::setprecision(2) << dM2M3_depth << "," << std::fixed << std::setprecision(6) << average_2d_dist << "," <<
+		std::fixed << std::setprecision(6) << average_3d_dist << ",";
 }
 
 
-Config::Config(const char* config_filepath) {
+Config::Config(const char* config_filepath, int* res) {
+	*res = 0;
 	std::ifstream config_file(config_filepath);
 	std::string line;
 	//get dimension
@@ -581,21 +576,17 @@ Config::Config(const char* config_filepath) {
 			std::string val = line.substr(line.length() - 1, line.length());
 			Config::dists_included[d] = (val.compare("y") == 0) ? true : false;
 		}
-		//if NUM_OF_STICKERS is 4, there is no mid1 sticker
-		if (NUM_OF_STICKERS == 4) {
-			if (dists_included[distances::left_mid1] || dists_included[distances::mid1_mid2] ||
-				dists_included[distances::mid1_mid3] || dists_included[distances::right_mid1]) {
-				logFile << "Warning: distance from mid1 was set to y, while number of stickers is 4. This distance will be disregarded.\n";
-				dists_included[distances::left_mid1] = dists_included[distances::mid1_mid2] =
-					dists_included[distances::mid1_mid3] = dists_included[distances::right_mid1] = false;
-			}
-		}
+		
+		// skip locations
+		getline(config_file, line);	// new line
+		getline(config_file, line);	// #location:...
+		getline(config_file, line);
 	}
 	else {
 		Config::mode = graph_mode::LOCATION;
 		std::getline(config_file, line); // new line
 		std::getline(config_file, line); // comment
-		//skip distances
+		// skip distances
 		getline(config_file, line);
 		while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
 		// get included stickers
@@ -605,11 +596,34 @@ Config::Config(const char* config_filepath) {
 			std::string val = line.substr(line.length() - 1, line.length());
 			Config::stickers_included[s] = (val.compare("y") == 0) ? true : false;
 		}
-		//if NUM_OF_STICKERS is 4, there is no mid1 sticker
-		if (NUM_OF_STICKERS == 4) {
-			if (stickers_included[stickers::mid1]) {
-				logFile << "Warning: location of mid1 was set to y, while number of stickers is 4. This location will be disregarded.\n";
-				stickers_included[stickers::mid1] = false;
+		
+	}
+
+	
+	while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
+	// get num of stickers
+	getline(config_file, line);
+	if (line.compare("4") == 0) NUM_OF_STICKERS = 4;
+	else NUM_OF_STICKERS = 5;
+	while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
+	// get 2Dmeasure unit
+	getline(config_file, line);
+	if (line.compare("cm") == 0) CALC_2D_BY_CM = true;
+	else CALC_2D_BY_CM = false;
+
+	// check illegal use of sticker mid1
+	// if NUM_OF_STICKERS is 4, there is no mid1 sticker
+	if (NUM_OF_STICKERS == 4) {
+		if (mode == graph_mode::LOCATION && stickers_included[stickers::mid1]) {
+			*res = 2;
+			stickers_included[stickers::mid1] = false;
+		}
+		if (mode != graph_mode::LOCATION) {
+			if (dists_included[distances::left_mid1] || dists_included[distances::mid1_mid2] ||
+				dists_included[distances::mid1_mid3] || dists_included[distances::right_mid1]) {
+				*res = 1;
+				dists_included[distances::left_mid1] = dists_included[distances::mid1_mid2] =
+					dists_included[distances::mid1_mid3] = dists_included[distances::right_mid1] = false;
 			}
 		}
 	}
@@ -636,7 +650,8 @@ void GraphPlot::_plotFourier(std::vector<cv::Point2d>& points)
 void GraphPlot::_plotDists(std::vector<cv::Point2d>& points)
 {
 	//axes.setXLim(std::pair<double, double>(Dx_LOWER_BOUND, Dx_UPPER_BOUND));
-	//axes.setYLim(std::pair<double, double>(Dy_LOWER_BOUND, Dy_UPPER_BOUND));
+	//axes.setYLim(std::pair<double, double>(lower, upper));
+	
 	axes.create<CvPlot::Series>(points, "-b");
 
 	long double f;
@@ -674,16 +689,16 @@ void GraphPlot::_plotNoGraph(std::vector<cv::Point2d>& points)
 	}
 
 	long double bpm = f * 60;
+	//&&&&&&&&&&&&&&&&
+	//const std::string bpm_title("Freq | BPM");
 
-	const std::string bpm_title("Freq | BPM");
+	//cv::Mat1d mat(1, 2);
+	//mat(0, 0) = f;
+	//mat(0, 1) = bpm;
+	//axes = CvPlot::plotImage(mat);
 
-	cv::Mat1d mat(1, 2);
-	mat(0, 0) = f;
-	mat(0, 1) = bpm;
-	axes = CvPlot::plotImage(mat);
-
-	axes.title(bpm_title);
-	window->update();
+	//axes.title(bpm_title);
+	//window->update();
 }
 
 void GraphPlot::_init_plot_window()
@@ -724,8 +739,9 @@ void GraphPlot::reset(clock_t start_time) {
 void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec)
 {
 	// TODO: Copy vector when we move this logic to the thread
-	if (first_plot) {
-		_init_plot_window();
+	if (first_plot) {	
+		//&&&&&&&&&&&&
+		if (_mode!= graph_mode::NOGRAPH) _init_plot_window();
 		first_plot = false;
 	}
 

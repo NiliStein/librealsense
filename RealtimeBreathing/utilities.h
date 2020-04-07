@@ -1,16 +1,51 @@
+#ifndef UTILITIES_H
+#define UTILITIES_H
 #pragma once
-//TODO: for logging
-#include <fstream>
 #include <librealsense2/rsutil.h>
 
 #define PI 3.14159265358979323846
 
+#define LOG_TITLES_4_STICKERS(D2units)"Frame_index,Color idx,Depth idx,Color timestamp,Depth timestamp,System color timestamp,System depth timestamp\
+,System timestamp,left (x y z) cm,right (x y z) cm,mid2  (x y z) cm,mid3  (x y z) cm,left (x y)" + D2units + ",right (x y) " + D2units + ",mid2 (x y) " + D2units + \
+",mid3 (x y) " + D2units + ",left - mid2 2D distance " + D2units + ",left - mid3 2D distance " + D2units + ",left - right 2D distance " + D2units + \
+",right - mid2 2D distance " + D2units + ",right - mid3 2D distance " + D2units + ",mid2 - mid3 2D distance " + D2units + ",left - mid2 3D distance (cm)\
+,left - mid3 3D distance (cm),left - right 3D distance (cm),right - mid2 3D distance (cm),right - mid3 3D distance (cm),mid2 - mid3 3D distance (cm)\
+,2D average distance,3D average distance,FPS,realSamplesNum,frequency,BPM\n"
 
-//TODO: for logging
-std::ofstream logFile("log.txt");
+#define LOG_TITLES_5_STICKERS(D2units) "Frame_index,Color idx,Depth idx,Color timestamp,Depth timestamp,System color timestamp,System depth timestamp\
+,System timestamp,left (x y z) cm,right (x y z) cm,mid1(x y z) cm,mid2  (x y z) cm,mid3  (x y z) cm,left (x y)" + D2units + ",right (x y) " + D2units + \
+",mid1 (x y) " + D2units + ",mid2 (x y) " + D2units + ",mid3 (x y) " + D2units + ",left - mid1 2D distance " + D2units + ",left - mid2 2D distance " + D2units + \
+",left - mid3 2D distance " + D2units + ",left - right 2D distance " + D2units + ",right - mid1 2D distance " + D2units + ",right - mid2 2D distance " + \
+D2units + ",right - mid3 2D distance " + D2units + ",mid1 - mid2 2D distance " + D2units + ",mid1 - mid3 2D distance " + D2units + ",mid2 - mid3 2D distance " + \
+ D2units + ",left - mid1 3D distance (cm),left - mid2 3D distance (cm),left - mid3 3D distance (cm),left - right 3D distance (cm),right - mid1 3D distance (cm),\
+right - mid2 3D distance (cm),right - mid3 3D distance (cm),mid1 - mid2 3D distance (cm),mid1 - mid3 3D distance (cm),mid2 - mid3 3D distance (cm),2D average \
+distance,3D average distance,FPS,realSamplesNum,frequency,BPM\n"
 
 
-// fill out with n values, evely spaced (hopefully) between a and b, including a and b
+// for logging
+std::ofstream logFile;
+
+void init_logFile(const char* filename, int num_of_stickers, std::string D2units) {
+	std::string name_prefix;
+	if (filename) {
+		//std::string file_name = filename;
+		name_prefix = "file_log";//file_name.substr(file_name.find("\\"), file_name.find("\."));
+	}
+	else {
+		name_prefix = "live_camera_log";
+	}
+	auto t = std::time(nullptr);
+	auto tm = *std::localtime(&t);
+	std::ostringstream oss;
+	oss << std::put_time(&tm, "%d-%m-%Y_%H-%M-%S");
+	//std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	//std::string name_suffix = std::ctime(&time);
+	std::string log_name = name_prefix + "_" + oss.str() + ".csv";
+	logFile.open(log_name);
+	(num_of_stickers == 4) ? logFile << LOG_TITLES_4_STICKERS(D2units) : logFile << LOG_TITLES_5_STICKERS(D2units);
+}
+
+// fill out with n values, evenly spaced between a and b, including a and b
 void linespace(double a, double b, int n, std::vector<double>* out) {
 	double step = (b - a) / (n - 1);
 	for (int i = 0; i < n - 1; i++) {
@@ -28,35 +63,7 @@ static float distance3D(float x, float y, float z, float a, float b, float c) {
 	return sqrt(pow(x - a, 2) + pow(y - b, 2) + pow(z - c, 2));
 }
 
-//TODO: gives same results as get_3d_coordinates. more complicated. remove.
-void get_3d_coordinates_2(const rs2::video_frame& color_frame, const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
-	float pixel[2] = { x, y };
-	
-	/*
-	rs2::pointcloud pc;
-	rs2::points points = pc.calculate(depth_frame);
-	*/
-	
-	
-	
-	float depth_pixel[2];
-	float point[3]; // From point (in 3D)
-	auto dist = depth_frame.get_distance(pixel[0], pixel[1]);
-	rs2_intrinsics depth_intr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
-	rs2_intrinsics color_intr = color_frame.get_profile().as<rs2::video_stream_profile>().get_intrinsics(); // Calibration data
-	rs2_extrinsics depth_to_color_extr = depth_frame.get_profile().as<rs2::video_stream_profile>().get_extrinsics_to(color_frame.get_profile().as<rs2::video_stream_profile>());
-	rs2_extrinsics color_to_depth_extr = color_frame.get_profile().as<rs2::video_stream_profile>().get_extrinsics_to(depth_frame.get_profile().as<rs2::video_stream_profile>());
-	//get depth pixel
-	rs2_project_color_pixel_to_depth_pixel(depth_pixel, reinterpret_cast<const uint16_t*>(depth_frame.get_data()), 0.001, 0.1, 10, &depth_intr, &color_intr, &color_to_depth_extr, &depth_to_color_extr, pixel);
-	
-	rs2_deproject_pixel_to_point(point, &depth_intr, depth_pixel, dist);
 
-	//convert to cm
-	output[0] = float(point[0]) * 100.0;
-	output[1] = float(point[1]) * 100.0;
-	output[2] = float(point[2]) * 100.0;
-
-}
 void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
 	float pixel[2] = { x, y };
 	float point[3]; // From point (in 3D)
@@ -76,7 +83,7 @@ void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, c
 
 bool check_illegal_3D_coordinates(const BreathingFrameData* breathing_data) {
 	bool illegal_3d_coordinates = false;
-	//check for 0,-0,0 3d coordinates. dump such frames
+	//check for 0,-0,0 3d coordinates.
 	for (std::pair<stickers, cv::Vec3f*> sticker_elem : breathing_data->stickers_map_cm) {
 		stickers s = sticker_elem.first;
 		cv::Vec3f* d3_coor = sticker_elem.second;
@@ -158,7 +165,14 @@ void FFT(short int dir, long m, double *x, double *y)
 		}
 	}
 }
-
+/*
+ * low pass filter. currently not in use.
+ * in - samples to be filtered
+ * dt - time delta between two samples
+ * fc - cutoff frequency
+ * size - number of samples
+ * returns filtered samples in param out
+ */
 void LPF(double* in, double dt, double fc, double* out, int size) {
 	double RC = 1 / (2 * PI * fc);
 	double alpha = dt / (RC + dt);
@@ -168,6 +182,14 @@ void LPF(double* in, double dt, double fc, double* out, int size) {
 	}
 }
 
+/*
+ * high pass filter. currently not in use.
+ * in - samples to be filtered
+ * dt - time delta between two samples
+ * fc - cutoff frequency
+ * size - number of samples
+ * returns filtered samples in param out
+ */
 void HPF(double* in, double dt, double fc, double* out, int size) {
 	double RC = 1 / (2 * PI * fc);
 	double alpha = dt / (RC + dt);
@@ -177,49 +199,6 @@ void HPF(double* in, double dt, double fc, double* out, int size) {
 	}
 }
 
-// assuming dists and time are ordered according to time (oldest fisrt)
-long double calc_frequency_dft(std::vector<cv::Point2d>* samples) {
-
-	int N = samples->size();	// N - number of samples (frames)
-
-	double t0 = samples->at(0).x;	// t0, t1 - start, end time(seconds)
-	double t1 = samples->at(N - 1).x;
-
-	int fps = N / (t1 - t0);	// FPS - frames per second
-
-	/*
-	// vector of frequency signatures
-	// note: frequency is  a vector of(N / 2) evenly spaced points between 0 and FPS / 2.
-	std::vector<double> frequencies;
-	linespace(0, fps / 2, N / 2, &frequencies);
-	*/
-	//std::vector<double> coef;
-
-	double C = 2 * PI / N;
-	int max_idx = 0;
-	double max_val = 0;
-	int mink = (4.0 / 60.0)*((N - 2.0) / fps);	// assume BPM >= 4
-	//calculate real part of coefficients
-	for (int k = mink; k <= N / 2; k++) {	//frequency 0 always most dominant. ignore first coef.
-		double coef_re = 0.0;
-		double coef_im = 0.0;
-		for (int n = 0; n < N; n++) {
-			coef_re += samples->at(n).y * cos(C*k*n);
-			coef_im += samples->at(n).y * sin(C*k*n);
-		}
-		double abs_val = coef_re * coef_re + coef_im * coef_im;
-		if (abs_val > max_val) {
-			max_val = abs_val;
-			max_idx = k;
-		}
-	}
-
-	float f = fps / (N - 2.0) * max_idx;
-	logFile << "method get_frequency (dft):\n";
-	logFile << "\nfrequency = fps / (N - 2.0) * max_idx: " << fps << " / (" << N << " - 2.0) * " << max_idx << " = " << f << '\n';
-
-	return f;
-}
 
 /*
 * To be used in D mode
@@ -227,7 +206,10 @@ long double calc_frequency_dft(std::vector<cv::Point2d>* samples) {
 * the avg distance is calculated only for distances set to true in user_cfg.dists_included
 */
 long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_frequencies = NULL) {
-	if (samples->size() < 2) return 0;
+	if (samples->size() < 5) {
+		logFile << '\n';
+		return 0;
+	}
 	int realSamplesNum = samples->size();	// N - number of samples (frames)
 	int realSamplesLog = log2(realSamplesNum);
 	// fft requires that the number of samples is a power of 2. add padding if needed
@@ -252,13 +234,9 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 	if (t1 == t0) return 0;
 	double fps = realSamplesNum / (t1 - t0);	// FPS - frames per second
 
-	//double dt = (t1 - t0) / realSamplesNum;	// time delta between two samples
-	//double fc = fps / 2;	// cutoff frequency
-	//double X_LPF[paddedSamplesNum] = { 0 };
-	//LPF(X, dt, fc, X_LPF, realSamplesNum);
-
 	FFT(dir, m, X, Y);
 
+	// following comented code return the average of -top- frequencies found by fourier
 	/*const int top = 100;
 	int top_max_idx[top] = { 0 };
 	double min_bpm = 7.0;
@@ -279,15 +257,8 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 	double avg_max_idx = 0;
 	for (int i = 0; i < top; i++)  avg_max_idx += top_max_idx[i];
 	avg_max_idx /= top;
-	logFile << "method get_frequency_fft:\n";
-	logFile << "fps: " << fps << '\n';
-	logFile << "realSamplesNum: " << realSamplesNum << '\n';
 	long double f = fps / (paddedSamplesNum - 2.0) * top_max_idx[0];
 	long double f_avg = fps / (paddedSamplesNum - 2.0) * avg_max_idx;
-	logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << top_max_idx[0] << " = " << f << '\n';
-	logFile << "frequency avg of two = fps / (paddedSamplesNum - 2.0) * avg_max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << avg_max_idx << "  = " << f_avg << '\n';
-	logFile << "    Frequency: " << f << "     BPM: " << 60.0*f << "\n";
-	logFile << "avg Frequency: " << f_avg << " avg BPM: " << 60.0*f_avg << "\n";
 	*/
 
 	int max_idx = 0;
@@ -296,11 +267,10 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 	int mini = ceil((min_bpm / 60.0)*((paddedSamplesNum - 2.0) / fps));	// assume BPM >= min_bpm
 	for (int i = 0; i < realSamplesNum / 2; i++) { //frequency 0 always most dominant. ignore first coef.
 		double val = abs(X[i])*abs(X[i]) + abs(Y[i])*abs(Y[i]);	
-		//double val = abs(X[i]);	//&&&&&&&&&TODO: choose method
 		if (out_frequencies != NULL) {
 			double frequency = fps / (paddedSamplesNum - 2.0) * i;
-			out_frequencies->push_back(cv::Point2d(frequency, abs(X[i])));
-			//out_frequencies->push_back(cv::Point2d(frequency, val));
+			//out_frequencies->push_back(cv::Point2d(frequency, abs(X[i])));
+			out_frequencies->push_back(cv::Point2d(frequency, val));
 		}
 		if (i >= mini && val > max_val) {
 			max_val = val;
@@ -311,17 +281,28 @@ long double calc_frequency_fft(std::vector<cv::Point2d>* samples, std::vector<cv
 	delete X;
 	delete Y;
 	
-	logFile << "fps: " << fps << '\n';
-	logFile << "realSamplesNum: " << realSamplesNum << '\n';
+	logFile << fps << ',';
+	logFile << realSamplesNum << ',';
 	long double f = fps / (paddedSamplesNum - 2.0) * max_idx;
-	//logFile << "frequency = fps / (paddedSamplesNum - 2.0) * max_idx: " << fps << " / (" << paddedSamplesNum << " - 2.0) * " << max_idx << " = " << f << '\n';
-	logFile << "frequency: " <<std::fixed <<std::setprecision(6) << f;
-	logFile << "\nBPM: " << std::fixed << std::setprecision(6) << f*60.0 << '\n';
+	logFile << std::fixed <<std::setprecision(6) << f << ',';
+	logFile << std::fixed << std::setprecision(6) << f*60.0 << '\n';
 	return f;
 }
 
+
+/* 
+ * calc_frequency_differently finds maximum points in given samples and caculates average time elapsed between two peaks
+ * the method uses two variables that mey need tuning:
+ * neighborhood - a maximum point will only count as a peak if its value is greater then all of its neighbors (needed to screen adjacant samples describing the same peak)
+ * threshold percentage -  a point will only count as a peak if its value is greate than max_threshold = max_dist - threshold_precentage * length (different peaks have
+ * different values. this threshold is needed to screen low local maximum points)
+ * return frequency
+ */
 long double calc_frequency_differently(std::vector<cv::Point2d>* samples, bool cm_units) {
-	if (samples->size() < 40) return 0;
+	if (samples->size() < 40) {
+		logFile << "\n";
+		return 0;
+	}
 	int neighborhood = (cm_units) ? 3 : 5;
 	double threshold_precentage = (cm_units) ? 27.0 / 100.0 : 45.0 / 100.0;
 	
@@ -353,28 +334,33 @@ long double calc_frequency_differently(std::vector<cv::Point2d>* samples, bool c
 		}
 	}
 	
-	if (peaks.size() < 2) return 0;
+	if (peaks.size() < 2) {
+		logFile << "\n";
+		return 0;
+	}
 	//get avg time lapse between picks
 	double time_lapses = 0.0;
 	for (int i = 0; i < peaks.size() - 1; i++) {
 		time_lapses += std::get<0>(peaks.at(i + 1)) - std::get<0>(peaks.at(i));
 	}
 	long double breath_cycle = time_lapses / (peaks.size() - 1.0);
-	logFile << "\nLength: " << length;
-	logFile << "\nmax_dist: " << max_dist;
-	logFile << "\nmin_dist: " << min_dist;
-	for (int i = 0; i < peaks.size(); i++) {
-		logFile << "\npick " << i << ": " << std::get<1>(peaks[i]) << " , " << std::get<0>(peaks[i]);
-	}
-	logFile << "\nNumber of picks: " << peaks.size();
-	logFile << "\nTotal time_lapses: " << time_lapses;
-	logFile << "\nbreath cycle: " << breath_cycle;
+	//logFile << "\nLength: " << length;
+	//logFile << "\nmax_dist: " << max_dist;
+	//logFile << "\nmin_dist: " << min_dist;
+	//for (int i = 0; i < peaks.size(); i++) {
+		//logFile << "\npick " << i << ": " << std::get<1>(peaks[i]) << " , " << std::get<0>(peaks[i]);
+	//}
+	//logFile << "\nNumber of picks: " << peaks.size();
+	//logFile << "\nTotal time_lapses: " << time_lapses;
+	//logFile << "\nbreath cycle: " << breath_cycle;
 	
 	long double bpm = 60.0 / breath_cycle;
-	logFile << "\nbpm: " << bpm;
-
 	long double f = bpm / 60.0;
-	logFile << "\nfrequncy: " << f;
+	
+	logFile << "-" << ","; // FPS coloumn
+	logFile << samples->size() << ","; // realSamplesNum coloumn
+	logFile << f << ",";
+	logFile << bpm << "\n";
 	return f;
 
 }
@@ -396,9 +382,12 @@ void normalize_distances(std::vector<cv::Point2d>* samples) {
 	}
 }
 
+
+
+
 /*
- *	parse samples from file in following format:
- *	new line for each sample. samples consists of time and distance separated by space (" "). time before distance.
+ *	parse samples from a text file in the following format:
+ *	new line for each sample. samples consist of time and distance separated by space (" "). time before distance.
  *	for exaple:
  *	0 0.0
  *	0.125 0.3090169943749474
@@ -421,7 +410,7 @@ void get_samples_from_file(std::vector<cv::Point2d>* samples) {
 }
 
 
-//	insert samples relevant for current window (from start_index to 250 + start_index) to out_window_samples
+// insert samples relevant for current window of size 250 (from start_index to 250 + start_index) to out_window_samples
 void simulate_running_window(int start_index, std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_window_samples) {
 	int end_index = (start_index + 250 > samples->size()) ? samples->size() : start_index + 250;
 	for (unsigned int i = start_index; i < end_index; i++) {
@@ -431,3 +420,5 @@ void simulate_running_window(int start_index, std::vector<cv::Point2d>* samples,
 	}
 	
 }
+
+#endif
