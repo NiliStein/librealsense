@@ -9,7 +9,7 @@
 #include <fstream>
 
 
-#define NUM_OF_LAST_FRAMES 250 
+#define NUM_OF_LAST_FRAMES 256 
 #define CONFIG_FILEPATH "config.txt"
 #define GET_FREQUENCY_BY_FFT true	//if false, use get_frequency_differently
 
@@ -146,8 +146,7 @@ public:
 
 	/* Gets the description of the frame in the following format:
 		TODO: update format */
-	std::string GetDescription();
-	void GetDescription_temp();
+	void GetDescription();
 	/* for a log with precision 2*/
 };
 

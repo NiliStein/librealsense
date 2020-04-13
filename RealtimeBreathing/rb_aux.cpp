@@ -227,13 +227,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	breathing_data->system_color_timestamp = (breathing_data->color_timestamp - first_timestamp) / double(CLOCKS_PER_SEC); //time elapsed from first timestamp in video - which timestamp?
 	breathing_data->system_depth_timestamp = (breathing_data->depth_timestamp - first_timestamp) / double(CLOCKS_PER_SEC);
 
-	/*
-	//TODO: for debugging:
-	if (this->interval_active) {
-		std::string interval_text = "\n------------------- start interval ---------------------\n";
-		logFile << interval_text;
-	}
-	*/
+
 	//check if frame id duplicated
 	bool is_dup = false;
 	int last_frame_index = (_n_frames + _oldest_frame_index - 1) % _n_frames;
@@ -256,7 +250,7 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	}
 	if (!is_dup) {
 		//TODO: for logging
-		breathing_data->GetDescription_temp();
+		breathing_data->GetDescription();
 		add_frame_data(breathing_data);
 	}
 	else {
@@ -473,63 +467,8 @@ void BreathingFrameData::CalculateDistances3D(Config* user_cfg)
 	average_3d_dist = average_3d_dist / (1.0*c);
 }
 
-std::string BreathingFrameData::GetDescription() 
-{
-	const std::string d2method = (CALC_2D_BY_CM) ? "cm" : "pixels";
-	std::string desc = "#################################################\nFrame idx: " + std::to_string(frame_idx);
-	desc += "\nColor idx : " + std::to_string(color_idx);
-	desc += "\nDepth idx : " + std::to_string(depth_idx);
-	desc += "\nColor timestamp: " + std::to_string(color_timestamp) +
-		"\nDepth timestamp: " + std::to_string(depth_timestamp) +
-		"\nSystem timestamp: " + std::to_string(system_timestamp) +
-		"\nSystem color timestamp: " + std::to_string(system_color_timestamp) +
-		"\nSystem depth timestamp: " + std::to_string(system_depth_timestamp) +
-		"\nCoordinates cm:\n" + 
-		"left: " + COORDINATES_TO_STRING_CM(left_cm) +
-		"\nright: " + COORDINATES_TO_STRING_CM(right_cm);
-	if (NUM_OF_STICKERS == 5) desc += "\nmid1: " + COORDINATES_TO_STRING_CM(mid1_cm);
-	desc += "\nmid2: " + COORDINATES_TO_STRING_CM(mid2_cm) +
-		"\nmid3: " + COORDINATES_TO_STRING_CM(mid3_cm) +
-		"\nCoordinates pixels:\n" + 
-		"left: " + COORDINATES_TO_STRING_PIXELS(left) +
-		"\nright: " + COORDINATES_TO_STRING_PIXELS(right);
-	if (NUM_OF_STICKERS == 5) desc += "\nmid1: " + COORDINATES_TO_STRING_PIXELS(mid1);
-	desc += "\nmid2: " + COORDINATES_TO_STRING_PIXELS(mid2) +
-		"\nmid3: " + COORDINATES_TO_STRING_PIXELS(mid3) +
-	"\n2D distances (" + d2method + "):";
 
-	if (NUM_OF_STICKERS == 5)  desc += "\nleft-mid1: " + std::to_string(dLM1);
-	desc += "\nleft-mid2: " + std::to_string(dLM2) +
-		"\nleft-mid3: " + std::to_string(dLM3) +
-		"\nleft-right: " + std::to_string(dLR);
-	if (NUM_OF_STICKERS == 5)  desc += "\nright-mid1: " + std::to_string(dRM1);
-	desc += "\nright-mid2: " + std::to_string(dRM2) +
-		"\nright-mid3: " + std::to_string(dRM3);
-	if (NUM_OF_STICKERS == 5) {
-		desc += "\nmid1-mid2: " + std::to_string(dM1M2) +
-			"\nmid1-mid3: " + std::to_string(dM1M3);
-	}
-	desc += "\nmid2-mid3: " + std::to_string(dM2M3) +
-		"\n3D distances:";
-
-	if (NUM_OF_STICKERS == 5)  desc += "\nleft-mid1: " + std::to_string(dLM1_depth);
-	desc += "\nleft-mid2: " + std::to_string(dLM2_depth) +
-		"\nleft-mid3: " + std::to_string(dLM3_depth) +
-		"\nleft-right: " + std::to_string(dLR_depth);
-	if (NUM_OF_STICKERS == 5)  desc += "\nright-mid1: " + std::to_string(dRM1_depth);
-	desc += "\nright-mid2: " + std::to_string(dRM2_depth) +
-		"\nright-mid3: " + std::to_string(dRM3_depth);
-	if (NUM_OF_STICKERS == 5) {
-		desc += "\nmid1-mid2: " + std::to_string(dM1M2_depth) +
-			"\nmid1-mid3: " + std::to_string(dM1M3_depth);
-	}
-	desc += "\nmid2-mid3: " + std::to_string(dM2M3_depth) +
-		"\n2D average distance: " + std::to_string(average_2d_dist) + " " + d2method +	
-		"\n3D average distance: " + std::to_string(average_3d_dist) + " cm\n";		
-	return desc;
-}
-
-void BreathingFrameData::GetDescription_temp()
+void BreathingFrameData::GetDescription()
 {
 	const std::string d2method = (CALC_2D_BY_CM) ? "cm" : "pixels";
 
@@ -667,7 +606,7 @@ void GraphPlot::_plotFourier(std::vector<cv::Point2d>& points)
 	axes.setXLim(std::pair<double, double>(0, 5));
 	axes.setYLim(std::pair<double, double>(0, 5));
 	axes.create<CvPlot::Series>(frequency_points, "-k");
-
+	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0; //&&&&&&
 	long double bpm = f * 60;
 
 	const std::string bpm_title("Freq: " + std::to_string(f) + " | " + " BPM: " + std::to_string(bpm));
@@ -693,7 +632,7 @@ void GraphPlot::_plotDists(std::vector<cv::Point2d>& points)
 		bool cm_units = (_dimension == dimension::D3) ? true : CALC_2D_BY_CM;
 		f = calc_frequency_differently(&points, cm_units);
 	}
-
+	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0; //&&&&&&
 	long double bpm = f * 60;
 	const std::string bpm_title("BPM: " + std::to_string(bpm));
 	axes.title(bpm_title);
@@ -717,18 +656,18 @@ void GraphPlot::_plotNoGraph(std::vector<cv::Point2d>& points)
 		bool cm_units = (_dimension == dimension::D3) ? true : CALC_2D_BY_CM;
 		f = calc_frequency_differently(&points, cm_units);
 	}
-
+	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0; //&&&&&&
 	long double bpm = f * 60;
-	//&&&&&&&&&&&&&&&&
-	//const std::string bpm_title("Freq | BPM");
+	
+	const std::string bpm_title("Freq | BPM");
 
-	//cv::Mat1d mat(1, 2);
-	//mat(0, 0) = f;
-	//mat(0, 1) = bpm;
-	//axes = CvPlot::plotImage(mat);
+	cv::Mat1d mat(1, 2);
+	mat(0, 0) = f;
+	mat(0, 1) = bpm;
+	axes = CvPlot::plotImage(mat);
 
-	//axes.title(bpm_title);
-	//window->update();
+	axes.title(bpm_title);
+	window->update();
 }
 
 void GraphPlot::_init_plot_window()
@@ -770,8 +709,7 @@ void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec)
 {
 	// TODO: Copy vector when we move this logic to the thread
 	if (first_plot) {	
-		//&&&&&&&&&&&&
-		if (_mode!= graph_mode::NOGRAPH) _init_plot_window();
+		_init_plot_window();
 		first_plot = false;
 	}
 

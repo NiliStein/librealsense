@@ -303,12 +303,13 @@ int main(int argc, char * argv[]) try
 			// present all the collected frames with opengl mosaic
 			app.show(render_frames);
 			
+			/*
 			end_time = clock();
 			//set interval of 15 seconds:
 			if (double(end_time - start_time) / double(CLOCKS_PER_SEC) >= 15.0) {
 				frame_manager.activateInterval(); //activate calculation since we have 15 seconds at least
 			}
-
+			*/
 			ImGui::NextColumn();
 
 			
