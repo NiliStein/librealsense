@@ -1,4 +1,10 @@
+
 /* Realtime Breathing Gui App */
+
+/* First written by Nili Furman & Maayan Ehrenberg, supervised by Alon Zrivin and Yaron Honen from GIP Lab
+   of the Technion - Israel Institute of Technology
+   For the use of Ichilov hospital in Israel. */
+
 /* To use multiple cameras, see rs-multicam: It's possible to use a pipe the same way, and measure all frames in all pipes. */
 
 #include <librealsense2/rs.hpp>
@@ -10,16 +16,6 @@
 #include <opencv2/opencv.hpp>
 #include <chrono>
 
-// copied os.h because project does comile when including it (seems to be due to double inclusion of rendering.h)
-// *****	START of os.h copy	*****
-
-//#pragma once
-//#include <vector>
-//#include <string>
-//#include <rendering.h>
-//struct GLFWmonitor;
-//struct GLFWwindow;
-
 #define FILE_ON_REPEAT false
 extern void init_logFile(const char* filename, int num_of_stickers, std::string D2units);
 extern std::ofstream logFile;
@@ -28,6 +24,10 @@ extern int NUM_OF_STICKERS;
 const char* config_err1 = "Warning: distance from mid1 was set to y, while number of stickers is 4. This distance will be disregarded.";
 const char* config_err2 = "Warning: location of mid1 was set to y, while number of stickers is 4. This location will be disregarded.";
 const char* config_errors[2] = { config_err1, config_err2 };
+
+// copied os.h because project does comile when including it (seems to be due to double inclusion of rendering.h)
+// *****	START of os.h copy	*****
+
 namespace rs2
 {
 	// Wrapper for cross-platform dialog control
@@ -38,16 +38,11 @@ namespace rs2
 	const char* file_dialog_open(file_dialog_mode flags, const char* filters, const char* default_path, const char* default_name);
 }
 
-
-
-
 // *****	END of os.h copy	*****
 
 int main(int argc, char * argv[]) try
 {
 	window app(1280, 720, "RealtimeBreathing");
-
-	//ImGui::CreateContext();
 
 	ImGui_ImplGlfw_Init(app, false);      // imgui library intializition
 	rs2::colorizer colorizer;		// helper to colorize depth images
@@ -70,19 +65,20 @@ int main(int argc, char * argv[]) try
 	FrameManager frame_manager(&user_cfg);
 	GraphPlot graph(user_cfg.mode, user_cfg.dimension, frame_manager.manager_start_time);
 
-	bool show_camera_stream = false;
+	bool show_camera_stream = false;	//boleans to control streaming
 	bool stream_enabled = false;
 	bool start_camera = false;
 
 	const char* filename = nullptr;	// filename will hold the name of an existing file chosen bu user to analyze.
-									// defined here, so that nullity can indeicate if file was already chosen or not.
+									// defined here, so that nullity can indicate if file was already chosen or not.
 	bool run_on_existing_file = false; // When true, run analysis for an existing file chosen by user through open_dialog.
 	bool recording = false; // When true, record camera stream to file.
 	bool pause = false;	// when true, pause streaming file. only available while sreaming from an existing file.
 	clock_t start_time, end_time; // measure time, for 15 seconds intervals.
 
-	//&&&&&&&& moved declaration for within the main loop to here, for use of freezing frame when pausing a stream from file
-	rs2::frameset fs; 
+	//moved declaration from within the main loop to here, for use of freezing frame when pausing a stream from file
+	rs2::frameset fs;
+
 	while (app) // application still alive?
 	{
 		// Flags for displaying ImGui window
@@ -96,6 +92,7 @@ int main(int argc, char * argv[]) try
 		ImGui::Begin("Menu", nullptr, flags); // Create a window called "Menu" and append into it
 		ImGui::Checkbox("Show Camera", &show_camera_stream);      // Checkbox: showing the camera stream
 		ImGui::Checkbox("Choose existing file", &run_on_existing_file);      // Checkbox: Choose an existing file to play and run anlysis for
+
 		if (config_res) ImGui::Text(config_errors[config_res - 1]);
 		
 			if (show_camera_stream && !run_on_existing_file) {
@@ -183,7 +180,7 @@ int main(int argc, char * argv[]) try
 						playback.resume();
 					}
 					else {
-						//&&&&&&&& following code freezez the last frame while pausing
+						//freez the last frame while pausing:
 						if (fs.size() > 0) {
 
 							auto d = fs.get_depth_frame();
@@ -253,8 +250,6 @@ int main(int argc, char * argv[]) try
 			}
 
 			// using the align object, we block the application until a frameset is available
-			//&&&&&&&& moved declaration to out of main loop (above)
-			//rs2::frameset fs; 
 			if (run_on_existing_file && !FILE_ON_REPEAT) {
 				if (!pipe.try_wait_for_frames(&fs, 1000)) {
 					/*
@@ -274,12 +269,6 @@ int main(int argc, char * argv[]) try
 				fs = pipe.wait_for_frames();
 			}
 
-		/*	rs2::frameset frameset_depth(fs);
-			rs2::frameset frameset_color(fs);*/
-
-			// align all frames to depth viewport
-			//fs = align_to_depth.process(fs);
-
 			// align all frames to color viewport
 			fs = align_to_color.process(fs);
 			// with the aligned frameset we proceed as usual
@@ -294,7 +283,7 @@ int main(int argc, char * argv[]) try
 			frame_manager.process_frame(color, depth);
 
 			// convert the newly-arrived frames to render-firendly format
-			//for (const auto& frame : fs) //iterate over all available frames. removed to ignore IR emitter frames.
+			//for (const auto& frame : fs) //iterate over all available frames. (commented out to ignore IR emitter frames.)
 			//{
 				render_frames[color.get_profile().unique_id()] = colorizer.process(color);
 				render_frames[depth.get_profile().unique_id()] = colorizer.process(depth);
@@ -310,9 +299,9 @@ int main(int argc, char * argv[]) try
 				frame_manager.activateInterval(); //activate calculation since we have 15 seconds at least
 			}
 			*/
+
 			ImGui::NextColumn();
 
-			
 			if (user_cfg.mode == graph_mode::DISTANCES) {
 
 				std::vector<cv::Point2d> points;
@@ -353,19 +342,6 @@ int main(int argc, char * argv[]) try
 }
 catch (const rs2::error & e)
 {
-	////If no camera found, we don't want to fail the app:
-	//if (!strcmp(e.what(), "No device connected")) {
-	//	ImGui::OpenPopup("Camera Disconnected");
-	//	bool open = true;
-	//	if (ImGui::BeginPopupModal("Camera Disconnected", &open))
-	//	{
-	//		//ImGui::Text("Camera is disconnected!\nConnect camera and then click 'Retry'.");
-	//		//if (ImGui::Button("Retry")) {
-	//		//	ImGui::CloseCurrentPopup();
-	//		//}
-	//		//ImGui::EndPopup();
-	//	}
-	//}
 	std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
 	return EXIT_FAILURE;
 }

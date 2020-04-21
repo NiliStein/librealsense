@@ -29,7 +29,7 @@ void init_logFile(const char* filename, int num_of_stickers, std::string D2units
 	std::string name_prefix;
 	if (filename) {
 		//std::string file_name = filename;
-		name_prefix = "file_log";//file_name.substr(file_name.find("\\"), file_name.find("\."));
+		name_prefix = "file_log"; //file_name.substr(file_name.find("\\"), file_name.find("\."));
 	}
 	else {
 		name_prefix = "live_camera_log";
@@ -38,8 +38,6 @@ void init_logFile(const char* filename, int num_of_stickers, std::string D2units
 	auto tm = *std::localtime(&t);
 	std::ostringstream oss;
 	oss << std::put_time(&tm, "%d-%m-%Y_%H-%M-%S");
-	//std::time_t time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	//std::string name_suffix = std::ctime(&time);
 	std::string log_name = name_prefix + "_" + oss.str() + ".csv";
 	logFile.open(log_name);
 	(num_of_stickers == 4) ? logFile << LOG_TITLES_4_STICKERS(D2units) : logFile << LOG_TITLES_5_STICKERS(D2units);
@@ -63,7 +61,6 @@ static float distance3D(float x, float y, float z, float a, float b, float c) {
 	return sqrt(pow(x - a, 2) + pow(y - b, 2) + pow(z - c, 2));
 }
 
-
 void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, cv::Vec3f& output) {
 	float pixel[2] = { x, y };
 	float point[3]; // From point (in 3D)
@@ -80,7 +77,6 @@ void get_3d_coordinates(const rs2::depth_frame& depth_frame, float x, float y, c
 
 }
 
-
 bool check_illegal_3D_coordinates(const BreathingFrameData* breathing_data) {
 	bool illegal_3d_coordinates = false;
 	//check for 0,-0,0 3d coordinates.
@@ -94,7 +90,6 @@ bool check_illegal_3D_coordinates(const BreathingFrameData* breathing_data) {
 	}
 	return illegal_3d_coordinates;
 }
-
 
 void FFT(short int dir, long m, double *x, double *y)
 {
@@ -125,8 +120,6 @@ void FFT(short int dir, long m, double *x, double *y)
 		}
 		j += k;
 	}
-
-
 
 	/* Compute the FFT */
 	c1 = -1.0;
@@ -165,6 +158,7 @@ void FFT(short int dir, long m, double *x, double *y)
 		}
 	}
 }
+
 /*
  * low pass filter. currently not in use.
  * in - samples to be filtered
@@ -382,9 +376,6 @@ void normalize_distances(std::vector<cv::Point2d>* samples) {
 	}
 }
 
-
-
-
 /*
  *	parse samples from a text file in the following format:
  *	new line for each sample. samples consist of time and distance separated by space (" "). time before distance.
@@ -408,7 +399,6 @@ void get_samples_from_file(std::vector<cv::Point2d>* samples) {
 	}
 	normalize_distances(samples);
 }
-
 
 // insert samples relevant for current window of size 250 (from start_index to 250 + start_index) to out_window_samples
 void simulate_running_window(int start_index, std::vector<cv::Point2d>* samples, std::vector<cv::Point2d>* out_window_samples) {

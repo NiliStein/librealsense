@@ -207,7 +207,6 @@ public:
 
 	
 
-
 private:
 	/**
 	 * Cleans all allocated resources
@@ -231,10 +230,14 @@ private:
 
 };
 
-/*	GraphManager class.
+/*	GraphPlot class.
 	Used for graph plotting.
-	@ data : vector of points, each point consists of x value and y value to plot.
-	@ plot_result : the matrix to render.
+	@ window : pointer to the graph window (created only once)
+	@ axes : axes created for the graph. More information in the documentation of CvPlot.
+	@ time_begin : beginning time of the plotting.
+	@ mode : the mode of the graph as configured in the config file. 
+	@ dimension : the dimension defined in the config file.
+	@ first_plot : boolen indicating if the graph is being plotted from the beginning or not.
 */
 class GraphPlot {
 private:
@@ -250,6 +253,7 @@ private:
 	void _plotLoc(std::vector<cv::Point2d>& points, const char * lineSpec);
 	void _plotNoGraph(std::vector<cv::Point2d>& points);
 	void _init_plot_window();
+
 public:
 
 	//ctor:

@@ -111,9 +111,9 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 		color_range_high = cv::Scalar(85, 255, 255);
 		low_thresh = 20;
 		break;
-	case(RED):
-	//	color_range_low = cv::Scalar(20, 50, 50);
-	//	color_range_high = cv::Scalar(135, 255, 255);
+	case(RED): //Red implementation missing: there are two foreign ranges of red, requires a slight change in implementation
+	//	color_range_low = cv::Scalar();
+	//	color_range_high = cv::Scalar();
 		break;
 	}
 
@@ -127,9 +127,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	cvtColor(color_only_mat, color_only_bgr8_mat, cv::COLOR_HSV2BGR);
 	cv::Mat color_only_grayscale_mat(cv::Size(color_frame.get_width(), color_frame.get_height()), CV_8UC3);
 	cvtColor(color_only_bgr8_mat, color_only_grayscale_mat, cv::COLOR_BGR2GRAY);
-	
-	// TODO: For Debug only, remove when finished
-	//cv::imwrite("frames\\yellow_grayscale.jpg", yellow_only_grayscale_mat);
 	
 	//create binary image:
 	cv::Mat image_th;
@@ -151,7 +148,6 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 		if (stats[i][cv::CC_STAT_AREA] > area_threshold) {
 			area_threshold = stats[i][cv::CC_STAT_AREA];
 		}
-
 	}
 	area_threshold = area_threshold / 2;
 
@@ -181,15 +177,12 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	get_3d_coordinates(depth_frame, float((*breathing_data->mid2)[0]), (*breathing_data->mid2)[1], breathing_data->mid2_cm);
 	get_3d_coordinates(depth_frame, float((*breathing_data->mid3)[0]), (*breathing_data->mid3)[1], breathing_data->mid3_cm);
 	
-	
-	
-	
 	//if user config dimension is 3D, check for 0,-0,0 3d coordinates. dump such frames
 	if (user_cfg->dimension == dimension::D3) {
 		if (check_illegal_3D_coordinates(breathing_data)) {
 			frames_dumped_in_row++;
-			logFile << "Warning: illegal 3D coordinates! frame was dumped.,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
-			if (frames_dumped_in_row >= 3) {
+			logFile << "Warning: illegal 3D coordinates! frame was dumped.,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,"; //NOTE: NUMBER OF ',' CHARACTERS MUST REMAIN AS IS!
+			if (frames_dumped_in_row >= 3) {								//This is required for transition to next columns in the log file! 
 				logFile << '\n';
 				cleanup();
 			}
@@ -218,15 +211,14 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 	
 	if (!first_timestamp) first_timestamp =
 		(breathing_data->color_timestamp < breathing_data->depth_timestamp) ?
-		breathing_data->color_timestamp :
-		breathing_data->depth_timestamp;
+			breathing_data->color_timestamp :
+			breathing_data->depth_timestamp;
 	breathing_data->frame_idx = frame_idx; 
 	frame_idx++;
 	breathing_data->color_idx = color_frame.get_frame_number();
 	breathing_data->depth_idx = depth_frame.get_frame_number();
 	breathing_data->system_color_timestamp = (breathing_data->color_timestamp - first_timestamp) / double(CLOCKS_PER_SEC); //time elapsed from first timestamp in video - which timestamp?
 	breathing_data->system_depth_timestamp = (breathing_data->depth_timestamp - first_timestamp) / double(CLOCKS_PER_SEC);
-
 
 	//check if frame id duplicated
 	bool is_dup = false;
@@ -245,16 +237,15 @@ void FrameManager::process_frame(const rs2::video_frame& color_frame, const rs2:
 				is_dup = true;
 			}
 		}
-		
-
 	}
 	if (!is_dup) {
-		//TODO: for logging
+		//for logging
 		breathing_data->GetDescription();
 		add_frame_data(breathing_data);
 	}
 	else {
 		logFile << ",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
+		//NOTE: NUMBER OF ',' CHARACTERS MUST REMAIN AS IS! This is required for transition to next columns in the log file!
 	}
 }
 
@@ -270,6 +261,7 @@ void FrameManager::cleanup()
 		}
 	}
 	logFile << "frames array cleanup...\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
+	//NOTE: NUMBER OF ',' CHARACTERS MUST REMAIN AS IS! This is required for transition to next columns in the log file!
 	frames_dumped_in_row = 0;
 }
 
@@ -289,13 +281,14 @@ void FrameManager::add_frame_data(BreathingFrameData * frame_data)
 void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
 	if (user_cfg->mode != graph_mode::LOCATION) {
 		logFile << "Warning: get_locations was called in incompatible mode! (use L mode),,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
+		//NOTE: NUMBER OF ',' CHARACTERS MUST REMAIN AS IS! This is required for transition to next columns in the log file!
 		return;
 	}
 	if (_frame_data_arr == NULL) return;	
 	
 	double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
 	for (unsigned int i = 0; i < _n_frames; i++) {
-		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_locations is run after add_frame_data (after _oldest_frame_idx++)
+		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //this is right order GIVEN that get_locations is run after add_frame_data (after _oldest_frame_idx++)
 		if (_frame_data_arr[idx] != NULL) {
 			//check if frame was received in under 15 sec
 			if ((current_time - _frame_data_arr[idx]->system_timestamp) <= 15.0) { //TODO: decide if needed
@@ -308,18 +301,21 @@ void FrameManager::get_locations(stickers s, std::vector<cv::Point2d> *out) {
 void FrameManager::get_dists(std::vector<cv::Point2d>* out) {
 	if (user_cfg->mode == graph_mode::LOCATION) {
 		logFile << "Warning: get_dists was called in LOCATION mode!,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,";
+		//NOTE: NUMBER OF ',' CHARACTERS MUST REMAIN AS IS! This is required for transition to next columns in the log file!
 		return;
 	}
 	if (_frame_data_arr == NULL) return;
 		
 	double current_time = (clock() - manager_start_time) / double(CLOCKS_PER_SEC);
 	for (unsigned int i = 0; i < _n_frames; i++) {
-		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //TODO: this is right order GIVEN that get_dists is run after add_frame_data (after _oldest_frame_idx++)
+		int idx = (_oldest_frame_index + i + _n_frames) % _n_frames; //this is right order GIVEN that get_dists is run after add_frame_data (after _oldest_frame_idx++)
 		if (_frame_data_arr[idx] != NULL) {
-			double avg_dist = (user_cfg->dimension == dimension::D2) ? _frame_data_arr[idx]->average_2d_dist : _frame_data_arr[idx]->average_3d_dist;
-			//&&&&&&&&&&&
-			//double t = _frame_data_arr[idx]->system_timestamp; 
-			double t = (user_cfg->dimension == dimension::D2) ? _frame_data_arr[idx]->system_color_timestamp : _frame_data_arr[idx]->system_depth_timestamp;
+			double avg_dist = (user_cfg->dimension == dimension::D2) ?
+				_frame_data_arr[idx]->average_2d_dist :
+				_frame_data_arr[idx]->average_3d_dist;
+			double t = (user_cfg->dimension == dimension::D2) ?
+				_frame_data_arr[idx]->system_color_timestamp :
+				_frame_data_arr[idx]->system_depth_timestamp;
 			out->push_back(cv::Point2d(t, avg_dist));
 		}
 	}
@@ -338,8 +334,6 @@ long double FrameManager::no_graph() {
 		bool cm_units = (user_cfg->dimension == dimension::D3) ? true : CALC_2D_BY_CM;
 		f = calc_frequency_differently(&points, cm_units);
 	}
-
-	
 	return f;
 }
 
@@ -427,7 +421,6 @@ void BreathingFrameData::CalculateDistances2D(Config* user_cfg)
 			c += 1;
 		}
 	}
-
 		average_2d_dist = average_2d_dist / (1.0*c);
 }
 
@@ -466,7 +459,6 @@ void BreathingFrameData::CalculateDistances3D(Config* user_cfg)
 
 	average_3d_dist = average_3d_dist / (1.0*c);
 }
-
 
 void BreathingFrameData::GetDescription()
 {
@@ -510,7 +502,6 @@ void BreathingFrameData::GetDescription()
 	logFile << std::fixed << std::setprecision(2) << dM2M3_depth << "," << std::fixed << std::setprecision(6) << average_2d_dist << "," <<
 		std::fixed << std::setprecision(6) << average_3d_dist << ",";
 }
-
 
 Config::Config(const char* config_filepath, int* res) {
 	*res = 0;
@@ -556,30 +547,42 @@ Config::Config(const char* config_filepath, int* res) {
 			std::string val = line.substr(line.length() - 1, line.length());
 			Config::stickers_included[s] = (val.compare("y") == 0) ? true : false;
 		}
-		
 	}
 
-	
-	while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
+	while (line.substr(0, 1).compare("#") != 0)
+		getline(config_file, line);
+
 	// get num of stickers
 	getline(config_file, line);
-	if (line.compare("4") == 0) NUM_OF_STICKERS = 4;
+
+	if (line.compare("4") == 0)
+		NUM_OF_STICKERS = 4;
+
 	else NUM_OF_STICKERS = 5;
-	while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
+
+	while (line.substr(0, 1).compare("#") != 0)
+		getline(config_file, line);
+
 	// get sticker color
 	getline(config_file, line);
 	std::string c = line.substr(0, 1);
-	if (c.compare("Y") == 0) color = sticker_color::YELLOW;
-	if (c.compare("B") == 0) color = sticker_color::BLUE;
-	//if (c.compare("R") == 0) color = sticker_color::RED;
-	if (c.compare("G") == 0) color = sticker_color::GREEN;
-	while (line.substr(0, 1).compare("#") != 0) getline(config_file, line);
+	if (c.compare("Y") == 0)
+		color = sticker_color::YELLOW;
+	else if (c.compare("B") == 0)
+		color = sticker_color::BLUE;
+	//else if (c.compare("R") == 0) color = sticker_color::RED;
+	else if (c.compare("G") == 0)
+		color = sticker_color::GREEN;
+
+	while (line.substr(0, 1).compare("#") != 0)
+		getline(config_file, line);
+
 	// get 2Dmeasure unit
 	getline(config_file, line);
-	if (line.compare("cm") == 0) CALC_2D_BY_CM = true;
+	if (line.compare("cm") == 0)
+		CALC_2D_BY_CM = true;
 	else CALC_2D_BY_CM = false;
 	
-
 	// check illegal use of sticker mid1
 	// if NUM_OF_STICKERS is 4, there is no mid1 sticker
 	if (NUM_OF_STICKERS == 4) {
@@ -606,7 +609,7 @@ void GraphPlot::_plotFourier(std::vector<cv::Point2d>& points)
 	axes.setXLim(std::pair<double, double>(0, 5));
 	axes.setYLim(std::pair<double, double>(0, 5));
 	axes.create<CvPlot::Series>(frequency_points, "-k");
-	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0; //&&&&&&
+	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0;
 	long double bpm = f * 60;
 
 	const std::string bpm_title("Freq: " + std::to_string(f) + " | " + " BPM: " + std::to_string(bpm));
@@ -632,7 +635,7 @@ void GraphPlot::_plotDists(std::vector<cv::Point2d>& points)
 		bool cm_units = (_dimension == dimension::D3) ? true : CALC_2D_BY_CM;
 		f = calc_frequency_differently(&points, cm_units);
 	}
-	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0; //&&&&&&
+	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0;
 	long double bpm = f * 60;
 	const std::string bpm_title("BPM: " + std::to_string(bpm));
 	axes.title(bpm_title);
@@ -656,7 +659,7 @@ void GraphPlot::_plotNoGraph(std::vector<cv::Point2d>& points)
 		bool cm_units = (_dimension == dimension::D3) ? true : CALC_2D_BY_CM;
 		f = calc_frequency_differently(&points, cm_units);
 	}
-	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0; //&&&&&&
+	if (points.size() < NUM_OF_LAST_FRAMES * 0.5) f = 0;
 	long double bpm = f * 60;
 	
 	const std::string bpm_title("Freq | BPM");
@@ -697,7 +700,6 @@ GraphPlot::GraphPlot(graph_mode mode, dimension dimension, clock_t start_time):
 }
 
 void GraphPlot::reset(clock_t start_time) {
-	
 	clock_t current_system_time = clock();
 	time_begin = (current_system_time - start_time) / double(CLOCKS_PER_SEC);
 	axes = CvPlot::makePlotAxes();
@@ -705,8 +707,7 @@ void GraphPlot::reset(clock_t start_time) {
 	first_plot = true;
 }
 
-void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec)
-{
+void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec) {
 	// TODO: Copy vector when we move this logic to the thread
 	if (first_plot) {	
 		_init_plot_window();
@@ -716,6 +717,7 @@ void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec)
 	if (_mode == graph_mode::FOURIER) {
 		axes = CvPlot::makePlotAxes();
 	}
+
 	switch (_mode) {
 	case graph_mode::DISTANCES:
 		_plotDists(points);
@@ -733,35 +735,39 @@ void GraphPlot::plot(std::vector<cv::Point2d>& points, const char * lineSpec)
 
 /* OLD FUNCTIONS: */
 
-//void save_last_frame(const char* filename, const rs2::video_frame& frame) {
-//	static int frame_index = 0;
-//	static int frame_counter = 0;
-//	static std::string frame_filenames[NUM_OF_LAST_FRAMES] = { "" };
-//
-//	std::string stream_desc{};
-//	std::string filename_base(filename);
-//
-//	stream_desc = rs2_stream_to_string(frame.get_profile().stream_type());
-//	auto t = std::time(nullptr);
-//	auto tm = *std::localtime(&t);
-//	std::ostringstream oss;
-//	oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
-//
-//	auto filename_png = filename_base + "_" + stream_desc + oss.str() + std::to_string(frame_counter) + ".png";
-//
-//	// delete oldest frame file 
-//	if (frame_filenames[frame_index] != "") {
-//		const int result = remove(frame_filenames[frame_index].c_str());
-//		if (result != 0) {
-//			printf("remove(%s) failed. Error: %s\n", frame_filenames[frame_index].c_str(), strerror(errno)); // No such file or directory
-//			// TODO: throw exception
-//		}
-//	}
-//
-//	rs2::save_to_png(filename_png.data(), frame.get_width(), frame.get_height(), frame.get_bytes_per_pixel(),
-//		frame.get_data(), frame.get_width() * frame.get_bytes_per_pixel());
-//
-//	frame_filenames[frame_index] = filename_png;
-//	frame_index = (frame_index + 1) % NUM_OF_LAST_FRAMES;
-//	frame_counter++;
-//}
+//functions used for debugging, might be useful for further needs
+
+/*
+void save_last_frame(const char* filename, const rs2::video_frame& frame) {
+	static int frame_index = 0;
+	static int frame_counter = 0;
+	static std::string frame_filenames[NUM_OF_LAST_FRAMES] = { "" };
+
+	std::string stream_desc{};
+	std::string filename_base(filename);
+
+	stream_desc = rs2_stream_to_string(frame.get_profile().stream_type());
+	auto t = std::time(nullptr);
+	auto tm = *std::localtime(&t);
+	std::ostringstream oss;
+	oss << std::put_time(&tm, "%d-%m-%Y %H-%M-%S");
+
+	auto filename_png = filename_base + "_" + stream_desc + oss.str() + std::to_string(frame_counter) + ".png";
+
+	// delete oldest frame file 
+	if (frame_filenames[frame_index] != "") {
+		const int result = remove(frame_filenames[frame_index].c_str());
+		if (result != 0) {
+			printf("remove(%s) failed. Error: %s\n", frame_filenames[frame_index].c_str(), strerror(errno)); // No such file or directory
+			// TODO: throw exception
+		}
+	}
+
+	rs2::save_to_png(filename_png.data(), frame.get_width(), frame.get_height(), frame.get_bytes_per_pixel(),
+		frame.get_data(), frame.get_width() * frame.get_bytes_per_pixel());
+
+	frame_filenames[frame_index] = filename_png;
+	frame_index = (frame_index + 1) % NUM_OF_LAST_FRAMES;
+	frame_counter++;
+}
+*/
