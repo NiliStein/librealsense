@@ -65,7 +65,7 @@ int main(int argc, char * argv[]) try
 	FrameManager frame_manager(&user_cfg);
 	GraphPlot graph(user_cfg.mode, user_cfg.dimension, frame_manager.manager_start_time);
 
-	bool show_camera_stream = false;	//boleans to control streaming
+	bool show_camera_stream = false;	//booleans to control streaming
 	bool stream_enabled = false;
 	bool start_camera = false;
 
@@ -122,7 +122,7 @@ int main(int argc, char * argv[]) try
 
 				}
 
-				if (ImGui::Button("record", { 50, 50 }))
+				if (ImGui::Button("Record", { 50, 50 }))
 				{
 					pipe.stop(); // Stop the pipeline with the default configuration
 					const char* out_filename = rs2::file_dialog_open(rs2::file_dialog_mode::save_file, "ROS-bag\0*.bag\0", NULL, NULL);
@@ -132,7 +132,7 @@ int main(int argc, char * argv[]) try
 				}
 
 				if (recording) {
-					if (ImGui::Button("stop\nrecord", { 50, 50 }))
+					if (ImGui::Button("Stop\nRecord", { 50, 50 }))
 					{
 						cfg.disable_all_streams();
 						cfg = rs2::config();
@@ -173,7 +173,7 @@ int main(int argc, char * argv[]) try
 				}
 
 				if (pause) {
-					if (ImGui::Button("unpause", { 50, 50 })) {
+					if (ImGui::Button("Continue", { 50, 50 })) {
 						pause = false;
 						rs2::device device = pipe.get_active_profile().get_device();
 						rs2::playback playback = device.as<rs2::playback>();
@@ -199,7 +199,7 @@ int main(int argc, char * argv[]) try
 					}
 				}
 				if (!pause) {
-					if (ImGui::Button("pause", { 50, 50 }))
+					if (ImGui::Button("Pause", { 50, 50 }))
 					{
 						pause = true;
 						rs2::device device = pipe.get_active_profile().get_device();
