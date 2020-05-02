@@ -42,7 +42,7 @@ namespace rs2
 
 int main(int argc, char * argv[]) try
 {
-	window app(1280, 720, "RealtimeBreathing");
+	window app(1280, 768, "RealtimeBreathing");
 
 	ImGui_ImplGlfw_Init(app, false);      // imgui library intializition
 	rs2::colorizer colorizer;		// helper to colorize depth images
@@ -121,14 +121,15 @@ int main(int argc, char * argv[]) try
 					init_logFile(filename, NUM_OF_STICKERS, D2units);
 
 				}
-
-				if (ImGui::Button("Record", { 50, 50 }))
-				{
-					pipe.stop(); // Stop the pipeline with the default configuration
-					const char* out_filename = rs2::file_dialog_open(rs2::file_dialog_mode::save_file, "ROS-bag\0*.bag\0", NULL, NULL);
-					cfg.enable_record_to_file(out_filename);
-					pipe.start(cfg); //File will be opened at this point
-					recording = true;
+				if (!recording) {
+					if (ImGui::Button("Record", { 50, 50 }))
+					{
+						pipe.stop(); // Stop the pipeline with the default configuration
+						const char* out_filename = rs2::file_dialog_open(rs2::file_dialog_mode::save_file, "ROS-bag\0*.bag\0", NULL, NULL);
+						cfg.enable_record_to_file(out_filename);
+						pipe.start(cfg); //File will be opened at this point
+						recording = true;
+					}
 				}
 
 				if (recording) {
@@ -173,7 +174,7 @@ int main(int argc, char * argv[]) try
 				}
 
 				if (pause) {
-					if (ImGui::Button("Continue", { 50, 50 })) {
+					if (ImGui::Button("Continue", { 60, 50 })) {
 						pause = false;
 						rs2::device device = pipe.get_active_profile().get_device();
 						rs2::playback playback = device.as<rs2::playback>();
